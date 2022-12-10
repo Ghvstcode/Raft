@@ -62,6 +62,15 @@ type CnsModule struct {
 
 	// State of this current Node
 	State RftState
+
+	dead int
+}
+
+func (cm *CnsModule) isAlive() bool {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	return cm.dead == 1
 }
 
 // GetState returns the current term of the specific node and whether it is a  leader
@@ -76,4 +85,18 @@ func (cm *CnsModule) electionTimeout() time.Duration {
 	// The testing program I am using requires an election to happen in
 	// about 5 secs of failure
 	return time.Duration(150+rand.Intn(250)) * time.Millisecond
+}
+
+func (cm *CnsModule) ticker() {
+	electionTimeout := cm.electionTimeout()
+	startingTerm, startingAsLeader := cm.GetState()
+
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		<-ticker.C
+
+		currentTerm, isLeader := cm.GetState()
+
+	}
 }
