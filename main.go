@@ -88,15 +88,18 @@ func (cm *CnsModule) electionTimeout() time.Duration {
 }
 
 func (cm *CnsModule) ticker() {
-	electionTimeout := cm.electionTimeout()
-	startingTerm, startingAsLeader := cm.GetState()
+	for cm.isAlive() == false {
+		electionTimeout := cm.electionTimeout()
+		startingTerm, startingAsLeader := cm.GetState()
 
-	ticker := time.NewTicker(10 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		<-ticker.C
+		ticker := time.NewTicker(10 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			<-ticker.C
 
-		currentTerm, isLeader := cm.GetState()
+			currentTerm, isLeader := cm.GetState()
+
+		}
 
 	}
 }
