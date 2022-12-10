@@ -1,6 +1,10 @@
 package main
 
-import "sync"
+import (
+	"math/rand"
+	"sync"
+	"time"
+)
 
 // LogEntry represents a log entry.
 // It holds information about the term when the entry was received by the leader
@@ -65,4 +69,11 @@ func (cm *CnsModule) GetState() (int, bool) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	return cm.CurrentTerm, cm.State == Leader
+}
+
+func (cm *CnsModule) electionTimeout() time.Duration {
+	// This is longer than the recommended timeout duration in sect 5.2
+	// The testing program I am using requires an election to happen in
+	// about 5 secs of failure
+	return time.Duration(150+rand.Intn(250)) * time.Millisecond
 }
