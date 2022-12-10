@@ -87,10 +87,12 @@ func (cm *CnsModule) electionTimeout() time.Duration {
 	return time.Duration(150+rand.Intn(250)) * time.Millisecond
 }
 
+// ticker runs in the background of each follow to be able to start an election if it does not..
+// receive a heartbeat in time
 func (cm *CnsModule) ticker() {
 	for cm.isAlive() == false {
 		electionTimeout := cm.electionTimeout()
-		startingTerm, startingAsLeader := cm.GetState()
+		startingTerm, _ := cm.GetState()
 
 		ticker := time.NewTicker(10 * time.Millisecond)
 		defer ticker.Stop()
@@ -113,6 +115,9 @@ func (cm *CnsModule) ticker() {
 			}
 
 			// Start the election at this point
+			if time.Since(cm.lastElectionReset) >= electionTimeout {
+				return
+			}
 		}
 
 	}
