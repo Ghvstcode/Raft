@@ -99,6 +99,20 @@ func (cm *CnsModule) ticker() {
 
 			currentTerm, isLeader := cm.GetState()
 
+			if isLeader {
+				// TODO add log here
+				return
+			}
+
+			// we check that the current Term has not been incremented
+			// A follower increments the term once another election has started
+			if startingTerm != currentTerm {
+				// TODO add another log here
+
+				return
+			}
+
+			// Start the election at this point
 		}
 
 	}
