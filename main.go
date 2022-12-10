@@ -64,6 +64,8 @@ type CnsModule struct {
 	State RftState
 
 	dead int
+	// TODO refactor this bit
+	lastElectionReset time.Time
 }
 
 func (cm *CnsModule) isAlive() bool {
