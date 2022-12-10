@@ -7,21 +7,62 @@ import "sync"
 // it contains command for the state machine
 type LogEntry struct{}
 
+// Persistence dummy struct
+type Persistence struct{}
+type RftState int
+
+const (
+	Follower RftState = iota
+	Candidate
+	Leader
+	Dead
+)
+
+func (s RftState) String() string {
+	switch s {
+	case Follower:
+		return "Follower"
+	case Candidate:
+		return "Candidate"
+	case Leader:
+		return "Leader"
+	case Dead:
+		return "Dead"
+	default:
+		return "Unkown"
+	}
+}
+
 // CnsModule is the consensus module on a server receives commands from clients and adds them to its log.
 // It communicates with the consensus modules on other servers to ensure that every log eventually
 // contains the same requests in the same order, even if some servers fail.
 // The fields in this struct are defined in Fig.2 of the Raft Paper
-type CnsModule struct{
+type CnsModule struct {
 	// persistent State Of all servers
 	CurrentTerm int
-	VotedFor int
-	Log []LogEntry
+	VotedFor    int
+	Log         []LogEntry
 
-// mu is a lock for synchronized access to this struct
+	// mu is a lock for synchronized access to this struct
 	mu sync.Mutex
-	// Me is the ID of this specific Node 
+	// Me is the ID of this specific Node
 	Me int
-   // peerIds 
+	// Peers is the ID of all other servers in the cluster
+	Peers []int
+	// Persistence layer
+	Persistence Persistence
+
+	// Volatile state on all servers
+	CommitIndex int
+	LastApplied int
+
+	// State of this current Node
+	State RftState
 }
 
-func (cm * CnsModule)
+// GetState returns the current term of the specific node and whether it is a  leader
+func (cm *CnsModule) GetState() (int, bool) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	return cm.CurrentTerm, cm.State == Leader
+}
