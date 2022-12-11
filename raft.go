@@ -71,10 +71,14 @@ type CnsModule struct {
 // RVArgs struct represents an argument to be passed to the requestVote RPC call
 // It is defined in figure 2 of the paper
 type RVArgs struct {
-	Term         int
-	CandidateID  int
-	LastlogIndex int
-	LastLongTerm int
+	// candidates Term
+	Term int
+	// ID of the candidate requesting the vote
+	CandidateID int
+	// index of the candidates last log entry
+	LastLogIndex int
+	// term of candidates last log entry
+	LastLogTerm int
 }
 
 // RVResults represents the response from the RPC call requesting for votes
