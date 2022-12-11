@@ -193,4 +193,9 @@ func (cm *CnsModule) requestVote(peerID, term int, votes *int) {
 	if state != Candidate {
 		return
 	}
+
+	// Check to see if the term has changed, if it has, this peer becomes a follower
+	if res.Term > term {
+		// Become follower
+	}
 }
