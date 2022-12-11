@@ -66,6 +66,11 @@ type CnsModule struct {
 	dead int
 	// TODO refactor this bit
 	lastElectionReset time.Time
+	server            Server
+}
+type Server interface {
+	// Call makes an RPC using the provided service method
+	Call(id int, service string, args interface{}, res interface{}) error
 }
 
 // RVArgs struct represents an argument to be passed to the requestVote RPC call
@@ -139,6 +144,7 @@ func (cm *CnsModule) ticker() {
 
 			// Start the election at this point
 			if time.Since(cm.lastElectionReset) >= electionTimeout {
+				cm.runElection()
 				return
 			}
 		}
@@ -147,29 +153,32 @@ func (cm *CnsModule) ticker() {
 }
 
 func (cm *CnsModule) runElection() {
-// setup all the things that needs to be done for this user to become a Candidate
-// section 5.2
+	// setup all the things that needs to be done for this user to become a Candidate
+	// section 5.2
 
-cm.CurrentTerm += 1
-cm.VotedFor = cm.Me
-cm.lastElectionReset = time.Now()
-cm.State = Candidate
+	cm.CurrentTerm += 1
+	cm.VotedFor = cm.Me
+	cm.lastElectionReset = time.Now()
+	cm.State = Candidate
 
-termAtStart := cm.CurrentTerm
+	termAtStart := cm.CurrentTerm
 
-votes := 1
+	votes := 1
 
-for _, peer := range cm.Peers {
-
+	for _, peer := range cm.Peers {
+		go cm.requestVote(peer, termAtStart)
+	}
+	go cm.ticker()
 }
-}
 
-func (cm *CnsModule) requestVote(peerID, term int){
- var res RVResults
- q := RVArgs{
-	 Term: term,
-	 CandidateID: cm.Me
- }
-// TODO add log here
-
+func (cm *CnsModule) requestVote(peerID, term int) {
+	var res RVResults
+	q := RVArgs{
+		Term:        term,
+		CandidateID: cm.Me,
+	}
+	// TODO add log here
+	if err := cm.server.Call(peerID, "", q, &res); err != nil {
+		return
+	}
 }
