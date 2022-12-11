@@ -145,3 +145,31 @@ func (cm *CnsModule) ticker() {
 
 	}
 }
+
+func (cm *CnsModule) runElection() {
+// setup all the things that needs to be done for this user to become a Candidate
+// section 5.2
+
+cm.CurrentTerm += 1
+cm.VotedFor = cm.Me
+cm.lastElectionReset = time.Now()
+cm.State = Candidate
+
+termAtStart := cm.CurrentTerm
+
+votes := 1
+
+for _, peer := range cm.Peers {
+
+}
+}
+
+func (cm *CnsModule) requestVote(peerID, term int){
+ var res RVResults
+ q := RVArgs{
+	 Term: term,
+	 CandidateID: cm.Me
+ }
+// TODO add log here
+
+}
