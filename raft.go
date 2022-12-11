@@ -196,6 +196,17 @@ func (cm *CnsModule) requestVote(peerID, term int, votes *int) {
 
 	// Check to see if the term has changed, if it has, this peer becomes a follower
 	if res.Term > term {
-		// Become follower
+		//  update the state of the peer to follower
+		cm.setState(Follower, res.Term, -1)
 	}
+}
+
+func (cm *CnsModule) setState(state RftState, term, votedFor int) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	cm.State = state
+	cm.CurrentTerm = term
+	cm.VotedFor = votedFor
+	cm.lastElectionReset = time.Now()
 }
