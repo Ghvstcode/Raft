@@ -102,10 +102,17 @@ func (cm *CnsModule) isAlive() bool {
 }
 
 // GetState returns the current term of the specific node and whether it is a  leader
-func (cm *CnsModule) GetState() (int, bool) {
+func (cm *CnsModule) isLeader() (int, bool) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	return cm.CurrentTerm, cm.State == Leader
+}
+
+// GetState returns the current term of the specific node and whether it is a  leader
+func (cm *CnsModule) GetState() (int, RftState) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	return cm.CurrentTerm, cm.State
 }
 
 func (cm *CnsModule) electionTimeout() time.Duration {
@@ -127,7 +134,7 @@ func (cm *CnsModule) ticker() {
 		for {
 			<-ticker.C
 
-			currentTerm, isLeader := cm.GetState()
+			currentTerm, isLeader := cm.isLeader()
 
 			if isLeader {
 				// TODO add log here
@@ -166,12 +173,12 @@ func (cm *CnsModule) runElection() {
 	votes := 1
 
 	for _, peer := range cm.Peers {
-		go cm.requestVote(peer, termAtStart)
+		go cm.requestVote(peer, termAtStart, &votes)
 	}
 	go cm.ticker()
 }
 
-func (cm *CnsModule) requestVote(peerID, term int) {
+func (cm *CnsModule) requestVote(peerID, term int, votes *int) {
 	var res RVResults
 	q := RVArgs{
 		Term:        term,
@@ -179,6 +186,11 @@ func (cm *CnsModule) requestVote(peerID, term int) {
 	}
 	// TODO add log here
 	if err := cm.server.Call(peerID, "", q, &res); err != nil {
+		return
+	}
+
+	_, state := cm.GetState()
+	if state != Candidate {
 		return
 	}
 }
