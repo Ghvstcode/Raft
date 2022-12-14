@@ -1,6 +1,8 @@
 package raft
 
 import (
+	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -237,14 +239,32 @@ func (cm *CnsModule) setState(state RftState, term, votedFor int) {
 	cm.lastElectionReset = time.Now()
 }
 
-func (cm *CnsModule) RpcCallInState(state RftState, id int, service string, args interface{}, res interface{}) error {
+// RpcCallOrFollower is a method that makes an RPC call to the provided method and becomes a folower if the
+// Term gotten from the response(CurrentTerm) is different from the starting Term before the RPC call was made
+func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service string, args interface{}, res interface{}) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	if err := cm.server.Call(id, service, args, res); err == nil {
 		if cm.State != state {
-			return nil
+			return errors.New(fmt.Sprintf("expected state %s but got state %s", state, cm.State)) 
 		}
+		v, ok := res.(RVResults)
+		if ok {
+			if v.Term > term {
+
+		cm.setState(Follower, term, -1)
+
+			} 
+		}
+
+		v, ok := res.(AppendEntriesArgs)
+		if ok {
+
+			if v.Term > term {
+				cm.setState(Follower, term, -1)
+
 	}
+	
 }
 
 // RVArgs struct represents an argument to be passed to the requestVote RPC
