@@ -178,7 +178,7 @@ func (cm *CnsModule) runElection() {
 	go cm.ticker()
 }
 
-func (cm *CnsModule) requestVote(peerID, term int, votes *int) {
+func (cm *CnsModule) requestVote(peerID, term int, votes int) {
 	var res RVResults
 	q := RVArgs{
 		Term:        term,
@@ -198,6 +198,15 @@ func (cm *CnsModule) requestVote(peerID, term int, votes *int) {
 	if res.Term > term {
 		//  update the state of the peer to follower
 		cm.setState(Follower, res.Term, -1)
+	}
+
+	if res.Term == term {
+		if res.VoteGranted {
+			if votes*2 > len(cm.Peers)+1 {
+				// start leader
+				// return
+			}
+		}
 	}
 }
 
