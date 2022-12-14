@@ -246,25 +246,23 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 	defer cm.mu.Unlock()
 	if err := cm.server.Call(id, service, args, res); err == nil {
 		if cm.State != state {
-			return errors.New(fmt.Sprintf("expected state %s but got state %s", state, cm.State)) 
+			return errors.New(fmt.Sprintf("expected state %s but got state %s", state, cm.State))
 		}
 		v, ok := res.(RVResults)
 		if ok {
 			if v.Term > term {
-
-		cm.setState(Follower, term, -1)
-
-			} 
+				cm.setState(Follower, term, -1)
+			}
 		}
 
-		v, ok := res.(AppendEntriesArgs)
+		v2, ok := res.(AppendEntriesArgs)
 		if ok {
-
-			if v.Term > term {
+			if v2.Term > term {
 				cm.setState(Follower, term, -1)
-
+			}
+		}
 	}
-	
+	return nil
 }
-}
+
 // RVArgs struct represents an argument to be passed to the requestVote RPC
