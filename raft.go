@@ -173,7 +173,8 @@ func (cm *CnsModule) runElection() {
 	votes := 1
 
 	for _, peer := range cm.Peers {
-		go cm.requestVote(peer, termAtStart, &votes)
+		go cm.requestVote(peer, termAtStart, votes)
+		votes++
 	}
 	go cm.ticker()
 }
@@ -204,7 +205,7 @@ func (cm *CnsModule) requestVote(peerID, term int, votes int) {
 		if res.VoteGranted {
 			if votes*2 > len(cm.Peers)+1 {
 				// start leader
-				// return
+				return
 			}
 		}
 	}
