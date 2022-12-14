@@ -266,5 +266,5 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 	}
 	
 }
-
+}
 // RVArgs struct represents an argument to be passed to the requestVote RPC
