@@ -252,6 +252,8 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 		if ok {
 			if v.Term > term {
 				cm.setState(Follower, term, -1)
+
+				return errors.New("peer has become follower")
 			}
 		}
 
@@ -259,8 +261,11 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 		if ok {
 			if v2.Term > term {
 				cm.setState(Follower, term, -1)
+				return errors.New("peer has become follower")
 			}
 		}
+	} else {
+		return err
 	}
 	return nil
 }
