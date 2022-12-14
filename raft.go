@@ -68,6 +68,20 @@ type CnsModule struct {
 	lastElectionReset time.Time
 	server            Server
 }
+type AppendEntriesArgs struct{
+	// Term is the leaders current term
+	Term int
+	// LeaderID is the ID of the leader so the follower can redirect clients when a new request comes in
+	LeaderID int
+	// PrevLogIndex is the index of the log entry immediately preceding new ones
+	PrevLogIndex int
+	//PrevLogTerm is the term of PrevLogIndex entry
+	PrevLogTerm int
+	//An array of the log entries to store
+	Entries [] LogEntry
+	//LeaderCommit is the leaders CommitIndex
+	LeaderCommit int
+}
 type Server interface {
 	// Call makes an RPC using the provided service method
 	Call(id int, service string, args interface{}, res interface{}) error
@@ -199,6 +213,8 @@ func (cm *CnsModule) requestVote(peerID, term int, votes int) {
 	if res.Term > term {
 		//  update the state of the peer to follower
 		cm.setState(Follower, res.Term, -1)
+
+		return 
 	}
 
 	if res.Term == term {
@@ -220,3 +236,18 @@ func (cm *CnsModule) setState(state RftState, term, votedFor int) {
 	cm.VotedFor = votedFor
 	cm.lastElectionReset = time.Now()
 }
+
+func (cm *CnsModule) RpcCallInState(state RftState, id int, service string, args interface{}, res interface{}) error{
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	if err :=	cm.server.Call(id, service, args ,res); err == nil{
+
+	
+	if cm.State != state{
+		return nil
+	}
+	
+}
+
+
+// RVArgs struct represents an argument to be passed to the requestVote RPC 
