@@ -210,6 +210,7 @@ func (cm *CnsModule) requestVote(peerID, term int, votes int) {
 		if res.VoteGranted {
 			if votes*2 > len(cm.Peers)+1 {
 				// start leader
+				cm.LeaderOps()
 				return
 			}
 		}
@@ -253,6 +254,38 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 		return err
 	}
 	return nil
+}
+
+func (cm *CnsModule) sendLeaderHeartbeats() {
+	cm.mu.Lock()
+	savedTerm := cm.CurrentTerm
+	cm.mu.Unlock()
+	for _, peer := range cm.Peers {
+		q := AppendEntriesArgs{
+			LeaderID: cm.Me,
+			Term:     savedTerm,
+		}
+
+		var res AppendEntriesArgs
+		go cm.RpcCallOrFollower(Follower, peer, savedTerm, "", q, &res)
+	}
+}
+
+func (cm *CnsModule) LeaderOps() {
+	cm.State = Leader
+	go func() {
+		ticker := time.NewTicker(50 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			cm.sendLeaderHeartbeats()
+			<-ticker.C
+			_, state := cm.GetState()
+			if state != Leader {
+				return
+			}
+		}
+	}()
 }
 
 // RVArgs struct represents an argument to be passed to the requestVote RPC
