@@ -202,20 +202,7 @@ func (cm *CnsModule) requestVote(peerID, term int, votes int) {
 		CandidateID: cm.Me,
 	}
 	// TODO add log here
-	if err := cm.server.Call(peerID, "", q, &res); err != nil {
-		return
-	}
-
-	_, state := cm.GetState()
-	if state != Candidate {
-		return
-	}
-
-	// Check to see if the term has changed, if it has, this peer becomes a follower
-	if res.Term > term {
-		//  update the state of the peer to follower
-		cm.setState(Follower, res.Term, -1)
-
+	if err := cm.RpcCallOrFollower(Candidate, peerID, term, "", q, &res); err != nil {
 		return
 	}
 
@@ -242,17 +229,15 @@ func (cm *CnsModule) setState(state RftState, term, votedFor int) {
 // RpcCallOrFollower is a method that makes an RPC call to the provided method and becomes a folower if the
 // Term gotten from the response(CurrentTerm) is different from the starting Term before the RPC call was made
 func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service string, args interface{}, res interface{}) error {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
 	if err := cm.server.Call(id, service, args, res); err == nil {
-		if cm.State != state {
+		_, currentState := cm.GetState()
+		if currentState != state {
 			return errors.New(fmt.Sprintf("expected state %s but got state %s", state, cm.State))
 		}
 		v, ok := res.(RVResults)
 		if ok {
 			if v.Term > term {
 				cm.setState(Follower, term, -1)
-
 				return errors.New("peer has become follower")
 			}
 		}
