@@ -314,13 +314,10 @@ func (cm *CnsModule) RequestVote(args RVArgs, res RVResults) error {
 		if state != Follower {
 			// Become follower
 
-		cm.setState(Follower, term, -1)
-	}
+			cm.setState(Follower, term, -1)
 		}
-
-		cm.lastElectionReset = time.Now()
-		res.Success = true
 	}
+
 	res.Term = term
 	return nil
 }
