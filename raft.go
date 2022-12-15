@@ -84,6 +84,12 @@ type AppendEntriesArgs struct {
 	// LeaderCommit is the leaders CommitIndex
 	LeaderCommit int
 }
+type AppendEntriesReply struct {
+	// currentTerm, for leader to update itself
+	Term int
+	// true if follower contained entry matching prevLogIndex and prevLogTerm
+	Success bool
+}
 type Server interface {
 	// Call makes an RPC using the provided service method
 	Call(id int, service string, args interface{}, res interface{}) error
@@ -266,7 +272,7 @@ func (cm *CnsModule) sendLeaderHeartbeats() {
 			Term:     savedTerm,
 		}
 
-		var res AppendEntriesArgs
+		var res AppendEntriesReply
 		go cm.RpcCallOrFollower(Follower, peer, savedTerm, "", q, &res)
 	}
 }
@@ -286,6 +292,56 @@ func (cm *CnsModule) LeaderOps() {
 			}
 		}
 	}()
+}
+
+func (cm *CnsModule) RequestVote(args RVArgs, res RVResults) error {
+	term, state := cm.GetState()
+	if state == Dead {
+		return nil
+	}
+	if args.Term > term {
+		// Become follower
+		cm.setState(Follower, term, -1)
+	}
+	res.VoteGranted = false
+	if cm.CurrentTerm == args.Term &&
+		(cm.VotedFor == -1 || cm.VotedFor == args.CandidateID) {
+		res.VoteGranted = true
+		cm.VotedFor = args.CandidateID
+		cm.lastElectionReset = time.Now()
+	}
+	if args.Term == term {
+		if state != Follower {
+			// Become follower
+		}
+
+		cm.lastElectionReset = time.Now()
+		res.Success = true
+	}
+	res.Term = term
+	return nil
+}
+
+func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res AppendEntriesReply) error {
+	term, state := cm.GetState()
+	if state == Dead {
+		return nil
+	}
+	if args.Term > term {
+		// Become follower
+		cm.setState(Follower, term, -1)
+	}
+	res.Success = false
+	if args.Term == term {
+		if state != Follower {
+			// Become follower
+		}
+
+		cm.lastElectionReset = time.Now()
+		res.Success = true
+	}
+	res.Term = term
+	return nil
 }
 
 // RVArgs struct represents an argument to be passed to the requestVote RPC
