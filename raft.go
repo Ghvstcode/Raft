@@ -90,10 +90,6 @@ type AppendEntriesReply struct {
 	// true if follower contained entry matching prevLogIndex and prevLogTerm
 	Success bool
 }
-type Server interface {
-	// Call makes an RPC using the provided service method
-	Call(id int, service string, args interface{}, res interface{}) error
-}
 
 // RVArgs struct represents an argument to be passed to the requestVote RPC call
 // It is defined in figure 2 of the paper
@@ -313,7 +309,6 @@ func (cm *CnsModule) RequestVote(args RVArgs, res RVResults) error {
 	if args.Term == term {
 		if state != Follower {
 			// Become follower
-
 			cm.setState(Follower, term, -1)
 		}
 	}
@@ -335,6 +330,7 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res AppendEntriesRepl
 	if args.Term == term {
 		if state != Follower {
 			// Become follower
+			cm.setState(Follower, term, -1)
 		}
 
 		cm.lastElectionReset = time.Now()
@@ -343,5 +339,3 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res AppendEntriesRepl
 	res.Term = term
 	return nil
 }
-
-// RVArgs struct represents an argument to be passed to the requestVote RPC
