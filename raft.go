@@ -24,6 +24,11 @@ const (
 	Dead
 )
 
+//type IcnsModule interface {
+//	GetState() (int, RftState)
+//	IsLeader() (int, bool)
+//}
+
 func (s RftState) String() string {
 	switch s {
 	case Follower:
@@ -68,7 +73,7 @@ type CnsModule struct {
 	dead int
 	// TODO refactor this bit
 	lastElectionReset time.Time
-	server            Server
+	server            IServer
 }
 type AppendEntriesArgs struct {
 	// Term is the leaders current term
@@ -120,7 +125,7 @@ func (cm *CnsModule) isAlive() bool {
 }
 
 // GetState returns the current term of the specific node and whether it is a  leader
-func (cm *CnsModule) isLeader() (int, bool) {
+func (cm *CnsModule) IsLeader() (int, bool) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	return cm.CurrentTerm, cm.State == Leader
@@ -152,7 +157,7 @@ func (cm *CnsModule) ticker() {
 		for {
 			<-ticker.C
 
-			currentTerm, isLeader := cm.isLeader()
+			currentTerm, isLeader := cm.IsLeader()
 
 			if isLeader {
 				// TODO add log here
