@@ -38,7 +38,7 @@ func (s *Server) GetListenAddr() net.Addr {
 
 func (s *Server) Serve() {
 	s.mu.Lock()
-	//s.cm = NewConsensusModule(s.serverId, s.peerIds, s, s.ready)
+	s.cm = NewConsensusModule(s.me, s.peerIds, s, s.ready)
 
 	// Create a new RPC server and register a RPCProxy that forwards all methods
 	// to n.cm
@@ -137,5 +137,6 @@ func NewServer(serverID int, peerIds []int, ready <-chan interface{}) *Server {
 	s.peers = make(map[int]*rpc.Client)
 	s.ready = ready
 	s.quit = make(chan interface{})
+	//s.cm
 	return s
 }

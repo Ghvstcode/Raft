@@ -117,6 +117,25 @@ type RVResults struct {
 	VoteGranted bool
 }
 
+func NewConsensusModule(id int, peerIds []int, server *Server, ready <-chan interface{}) *CnsModule {
+	cm := new(CnsModule)
+	cm.Me = id
+	cm.Peers = peerIds
+	cm.iserver = server
+	cm.State = Follower
+	cm.VotedFor = -1
+
+	go func() {
+		<-ready
+		cm.mu.Lock()
+		cm.lastElectionReset = time.Now()
+		cm.mu.Unlock()
+		cm.runElection()
+	}()
+
+	return cm
+}
+
 func (cm *CnsModule) isAlive() bool {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
