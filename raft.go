@@ -205,18 +205,18 @@ func (cm *CnsModule) runElection() {
 	// setup all the things that needs to be done for this user to become a Candidate
 	// section 5.2
 
-	cm.CurrentTerm += 1
-	cm.VotedFor = cm.Me
-	cm.lastElectionReset = time.Now()
-	cm.State = Candidate
+	cm.setState(Candidate, cm.CurrentTerm+1, cm.Me)
+
+	var m sync.Mutex
 
 	termAtStart := cm.CurrentTerm
-
 	votes := 1
 
 	for _, peer := range cm.Peers {
 		go cm.requestVote(peer, termAtStart, votes)
+		m.Lock()
 		votes++
+		m.Unlock()
 	}
 	go cm.ticker()
 }
@@ -228,7 +228,7 @@ func (cm *CnsModule) requestVote(peerID, term int, votes int) {
 		CandidateID: cm.Me,
 	}
 	// TODO add log here
-	if err := cm.RpcCallOrFollower(Candidate, peerID, term, "", q, &res); err != nil {
+	if err := cm.RpcCallOrFollower(Candidate, peerID, term, "CnsModule.RequestVote", q, &res); err != nil {
 		return
 	}
 
@@ -239,18 +239,18 @@ func (cm *CnsModule) requestVote(peerID, term int, votes int) {
 				cm.LeaderOps()
 				return
 			}
+
 		}
 	}
 }
 
 func (cm *CnsModule) setState(state RftState, term, votedFor int) {
 	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	cm.State = state
+	//cm.State = state
 	cm.CurrentTerm = term
 	cm.VotedFor = votedFor
 	cm.lastElectionReset = time.Now()
+	cm.mu.Unlock()
 }
 
 // RpcCallOrFollower is a method that makes an RPC call to the provided method and becomes a folower if the
@@ -293,7 +293,7 @@ func (cm *CnsModule) sendLeaderHeartbeats() {
 		}
 
 		var res AppendEntriesReply
-		go cm.RpcCallOrFollower(Follower, peer, savedTerm, "", q, &res)
+		go cm.RpcCallOrFollower(Follower, peer, savedTerm, "CnsModule.AppendEntries", q, &res)
 	}
 }
 

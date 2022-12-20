@@ -16,6 +16,8 @@ func (pp *Proxy) AppendEntries(args AppendEntriesArgs, res *AppendEntriesReply) 
 }
 
 func (cm *CnsModule) RequestVote(args RVArgs, res *RVResults) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	term, state := cm.GetState()
 	if state == Dead {
 		return nil
@@ -43,6 +45,8 @@ func (cm *CnsModule) RequestVote(args RVArgs, res *RVResults) error {
 }
 
 func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesReply) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	term, state := cm.GetState()
 	if state == Dead {
 		return nil
