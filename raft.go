@@ -73,7 +73,7 @@ type CnsModule struct {
 	dead int
 	// TODO refactor this bit
 	lastElectionReset time.Time
-	server            IServer
+	iserver           IServer
 }
 type AppendEntriesArgs struct {
 	// Term is the leaders current term
@@ -237,7 +237,7 @@ func (cm *CnsModule) setState(state RftState, term, votedFor int) {
 // RpcCallOrFollower is a method that makes an RPC call to the provided method and becomes a folower if the
 // Term gotten from the response(CurrentTerm) is different from the starting Term before the RPC call was made
 func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service string, args interface{}, res interface{}) error {
-	if err := cm.server.Call(id, service, args, res); err == nil {
+	if err := cm.iserver.Call(id, service, args, res); err == nil {
 		_, currentState := cm.GetState()
 		if currentState != state {
 			return errors.New(fmt.Sprintf("expected state %s but got state %s", state, cm.State))
@@ -293,54 +293,4 @@ func (cm *CnsModule) LeaderOps() {
 			}
 		}
 	}()
-}
-
-func (cm *CnsModule) RequestVote(args RVArgs, res RVResults) error {
-	term, state := cm.GetState()
-	if state == Dead {
-		return nil
-	}
-	if args.Term > term {
-		// Become follower
-		cm.setState(Follower, term, -1)
-	}
-	res.VoteGranted = false
-	if cm.CurrentTerm == args.Term &&
-		(cm.VotedFor == -1 || cm.VotedFor == args.CandidateID) {
-		res.VoteGranted = true
-		cm.VotedFor = args.CandidateID
-		cm.lastElectionReset = time.Now()
-	}
-	if args.Term == term {
-		if state != Follower {
-			// Become follower
-			cm.setState(Follower, term, -1)
-		}
-	}
-
-	res.Term = term
-	return nil
-}
-
-func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res AppendEntriesReply) error {
-	term, state := cm.GetState()
-	if state == Dead {
-		return nil
-	}
-	if args.Term > term {
-		// Become follower
-		cm.setState(Follower, term, -1)
-	}
-	res.Success = false
-	if args.Term == term {
-		if state != Follower {
-			// Become follower
-			cm.setState(Follower, term, -1)
-		}
-
-		cm.lastElectionReset = time.Now()
-		res.Success = true
-	}
-	res.Term = term
-	return nil
 }
