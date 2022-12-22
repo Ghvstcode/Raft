@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -130,7 +131,7 @@ func NewConsensusModule(id int, peerIds []int, server *Server, ready <-chan inte
 		cm.mu.Lock()
 		cm.lastElectionReset = time.Now()
 		cm.mu.Unlock()
-		cm.runElection()
+		cm.ticker()
 	}()
 
 	return cm
@@ -143,11 +144,36 @@ func (cm *CnsModule) isAlive() bool {
 	return cm.dead == 1
 }
 
+const mutexLocked = 1
+
+func MutexLocked(m *sync.Mutex) bool {
+	state := reflect.ValueOf(m).Elem().FieldByName("state")
+	return state.Int()&mutexLocked == mutexLocked
+}
+
 // GetState returns the current term of the specific node and whether it is a  leader
 func (cm *CnsModule) IsLeader() (int, bool) {
+	// fmt.Println("leaderhereee")
+
 	cm.mu.Lock()
+	// fmt.Println("sth sth 159")
 	defer cm.mu.Unlock()
+	// defer cm.mu.Unlock()
+	// fmt.Println("MUTEXLOCKED157", MutexLocked(&cm.mu))
+	// term := cm.CurrentTerm
+	// state := cm.State
+	// cm.mu.Unlock()
+
+	//fmt.Println("MUTEXLOCKED", MutexLocked(&cm.mu))
+	//fmt.Println("Term", term)
+	//defer func() {
+	//	fmt.Println("leaderhereee")
+	//	//cm.mu.Unlock()
+	//}()
+
+	// return 0, false
 	return cm.CurrentTerm, cm.State == Leader
+	// return 0, true
 }
 
 // GetState returns the current term of the specific node and whether it is a  leader
@@ -167,6 +193,8 @@ func (cm *CnsModule) electionTimeout() time.Duration {
 // ticker runs in the background of each follow to be able to start an election if it does not..
 // receive a heartbeat in time
 func (cm *CnsModule) ticker() {
+	// cm.mu.Lock()
+	// defer cm.mu.Unlock()
 	for cm.isAlive() == false {
 		electionTimeout := cm.electionTimeout()
 		startingTerm, _ := cm.GetState()
@@ -175,11 +203,12 @@ func (cm *CnsModule) ticker() {
 		defer ticker.Stop()
 		for {
 			<-ticker.C
-
+			// fmt.Println("itr")
 			currentTerm, isLeader := cm.IsLeader()
-
+			//:= cm.IsLeader()
 			if isLeader {
 				// TODO add log here
+				fmt.Println("isLeaders209")
 				return
 			}
 
@@ -187,15 +216,20 @@ func (cm *CnsModule) ticker() {
 			// A follower increments the term once another election has started
 			if startingTerm != currentTerm {
 				// TODO add another log here
-
+				fmt.Println("217")
 				return
 			}
 
 			// Start the election at this point
+			cm.mu.Lock()
 			if time.Since(cm.lastElectionReset) >= electionTimeout {
+				cm.mu.Unlock()
 				cm.runElection()
+
 				return
 			}
+
+			cm.mu.Unlock()
 		}
 
 	}
@@ -204,9 +238,10 @@ func (cm *CnsModule) ticker() {
 func (cm *CnsModule) runElection() {
 	// setup all the things that needs to be done for this user to become a Candidate
 	// section 5.2
-
+	fmt.Println("starting an election", cm.CurrentTerm)
 	cm.setState(Candidate, cm.CurrentTerm+1, cm.Me)
 
+	// fmt.Println(cm)
 	var m sync.Mutex
 
 	termAtStart := cm.CurrentTerm
@@ -222,20 +257,26 @@ func (cm *CnsModule) runElection() {
 }
 
 func (cm *CnsModule) requestVote(peerID, term int, votes int) {
+	fmt.Println("Requesting votesss")
 	var res RVResults
 	q := RVArgs{
 		Term:        term,
-		CandidateID: cm.Me,
+		CandidateID: peerID,
 	}
 	// TODO add log here
+	fmt.Println("CM JUST BEFORE", cm.State, term)
 	if err := cm.RpcCallOrFollower(Candidate, peerID, term, "CnsModule.RequestVote", q, &res); err != nil {
+		fmt.Println("ERR", err)
 		return
 	}
 
 	if res.Term == term {
+		fmt.Println("266-I was hit", res.VoteGranted)
 		if res.VoteGranted {
+			fmt.Println("268-I was hit")
 			if votes*2 > len(cm.Peers)+1 {
 				// start leader
+				fmt.Println("leaderops about to start")
 				cm.LeaderOps()
 				return
 			}
@@ -245,8 +286,9 @@ func (cm *CnsModule) requestVote(peerID, term int, votes int) {
 }
 
 func (cm *CnsModule) setState(state RftState, term, votedFor int) {
+	fmt.Println("term", term)
 	cm.mu.Lock()
-	//cm.State = state
+	cm.State = state
 	cm.CurrentTerm = term
 	cm.VotedFor = votedFor
 	cm.lastElectionReset = time.Now()
@@ -259,7 +301,7 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 	if err := cm.iserver.Call(id, service, args, res); err == nil {
 		_, currentState := cm.GetState()
 		if currentState != state {
-			return errors.New(fmt.Sprintf("expected state %s but got state %s", state, cm.State))
+			return errors.New(fmt.Sprintf("expected state %s but got state %s", state, currentState))
 		}
 		v, ok := res.(RVResults)
 		if ok {
@@ -269,7 +311,7 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 			}
 		}
 
-		v2, ok := res.(AppendEntriesArgs)
+		v2, ok := res.(AppendEntriesReply)
 		if ok {
 			if v2.Term > term {
 				cm.setState(Follower, term, -1)
@@ -277,6 +319,7 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 			}
 		}
 	} else {
+		fmt.Println(err, "Error280raft.go")
 		return err
 	}
 	return nil
@@ -285,6 +328,10 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 func (cm *CnsModule) sendLeaderHeartbeats() {
 	cm.mu.Lock()
 	savedTerm := cm.CurrentTerm
+	if cm.State != Leader {
+		cm.mu.Unlock()
+		return
+	}
 	cm.mu.Unlock()
 	for _, peer := range cm.Peers {
 		q := AppendEntriesArgs{
@@ -298,6 +345,8 @@ func (cm *CnsModule) sendLeaderHeartbeats() {
 }
 
 func (cm *CnsModule) LeaderOps() {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	cm.State = Leader
 	go func() {
 		ticker := time.NewTicker(50 * time.Millisecond)
