@@ -153,27 +153,9 @@ func MutexLocked(m *sync.Mutex) bool {
 
 // GetState returns the current term of the specific node and whether it is a  leader
 func (cm *CnsModule) IsLeader() (int, bool) {
-	// fmt.Println("leaderhereee")
-
 	cm.mu.Lock()
-	// fmt.Println("sth sth 159")
 	defer cm.mu.Unlock()
-	// defer cm.mu.Unlock()
-	// fmt.Println("MUTEXLOCKED157", MutexLocked(&cm.mu))
-	// term := cm.CurrentTerm
-	// state := cm.State
-	// cm.mu.Unlock()
-
-	//fmt.Println("MUTEXLOCKED", MutexLocked(&cm.mu))
-	//fmt.Println("Term", term)
-	//defer func() {
-	//	fmt.Println("leaderhereee")
-	//	//cm.mu.Unlock()
-	//}()
-
-	// return 0, false
 	return cm.CurrentTerm, cm.State == Leader
-	// return 0, true
 }
 
 // GetState returns the current term of the specific node and whether it is a  leader
@@ -187,65 +169,57 @@ func (cm *CnsModule) electionTimeout() time.Duration {
 	// This is longer than the recommended timeout duration in sect 5.2
 	// The testing program I am using requires an election to happen in
 	// about 5 secs of failure
-	return time.Duration(150+rand.Intn(250)) * time.Millisecond
+	return time.Duration(150+rand.Intn(150)) * time.Millisecond
 }
 
 // ticker runs in the background of each follow to be able to start an election if it does not..
 // receive a heartbeat in time
 func (cm *CnsModule) ticker() {
-	// cm.mu.Lock()
-	// defer cm.mu.Unlock()
-	// for cm.isAlive() == false {
-	electionTimeout := cm.electionTimeout()
-	startingTerm, _ := cm.GetState()
+	for cm.isAlive() == false {
+		electionTimeout := cm.electionTimeout()
+		startingTerm, _ := cm.GetState()
 
-	ticker := time.NewTicker(10 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		<-ticker.C
-		// fmt.Println("itr")
-		currentTerm, isLeader := cm.IsLeader()
-		//:= cm.IsLeader()
-		if isLeader {
-			// TODO add log here
-			fmt.Println("isLeaders209")
-			return
-		}
-		fmt.Println("startingTerm", startingTerm, currentTerm)
-		// we check that the current Term has not been incremented
-		// A follower increments the term once another election has started
-		if startingTerm != currentTerm {
-			// TODO add another log here
-			fmt.Println("217")
-			return
-		}
+		ticker := time.NewTicker(10 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			<-ticker.C
 
-		// Start the election at this point
-		cm.mu.Lock()
-		// fmt.Println("cm.lastElectionReset", cm.lastElectionReset, time.Since(cm.lastElectionReset), electionTimeout)
-		if time.Since(cm.lastElectionReset) >= electionTimeout {
+			currentTerm, isLeader := cm.IsLeader()
+			if isLeader {
+				// TODO add log here
+				return
+			}
+
+			// we check that the current Term has not been incremented
+			// A follower increments the term once another election has started
+			if startingTerm != currentTerm {
+				// TODO add another log here
+				return
+			}
+
+			// Start the election at this point
+			cm.mu.Lock()
+			if time.Since(cm.lastElectionReset) >= electionTimeout {
+				cm.mu.Unlock()
+				cm.runElection()
+
+				return
+			}
+
 			cm.mu.Unlock()
-			cm.runElection()
-
-			return
 		}
 
-		cm.mu.Unlock()
 	}
-
-	//}
 }
 
 func (cm *CnsModule) runElection() {
 	// setup all the things that needs to be done for this user to become a Candidate
 	// section 5.2
-	fmt.Println("starting an election", cm.Me)
 	cm.setState(Candidate, cm.CurrentTerm, cm.Me)
 
 	var m sync.Mutex
 
 	termAtStart := cm.CurrentTerm
-	fmt.Println(cm.CurrentTerm)
 	votes := 1
 
 	for _, peer := range cm.Peers {
@@ -254,7 +228,6 @@ func (cm *CnsModule) runElection() {
 		votes++
 		m.Unlock()
 
-		fmt.Println("votes", votes)
 	}
 	go cm.ticker()
 }
@@ -265,19 +238,18 @@ func (cm *CnsModule) requestVote(peerID, term, votes, candidate int) {
 		Term:        term,
 		CandidateID: candidate,
 	}
+
 	// TODO add log here
 	if err := cm.RpcCallOrFollower(Candidate, peerID, term, "CnsModule.RequestVote", q, &res); err != nil {
-		fmt.Println("ERR", err)
+		//TODO LOG ERROR
 		return
 	}
-	// fmt.Println("term issues", res.Term, term)
+
 	if res.Term == term {
-		fmt.Println("term issues", res.Term, term)
 		if res.VoteGranted {
 			nv := votes + 1
 			if nv*2 > len(cm.Peers)+1 {
 				// start leader
-				fmt.Println("leaderops about to start")
 				cm.LeaderOps()
 				return
 			}
@@ -303,7 +275,6 @@ func (cm *CnsModule) setState(state RftState, term, votedFor int) {
 // RpcCallOrFollower is a method that makes an RPC call to the provided method and becomes a folower if the
 // Term gotten from the response(CurrentTerm) is different from the starting Term before the RPC call was made
 func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service string, args interface{}, res interface{}) error {
-	fmt.Println("RPCALLLLLL", service)
 	if err := cm.iserver.Call(id, service, args, res); err == nil {
 		_, currentState := cm.GetState()
 		if currentState != state {
@@ -325,7 +296,6 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 			}
 		}
 	} else {
-		fmt.Println(err, "Error280raft.go")
 		return err
 	}
 	return nil
