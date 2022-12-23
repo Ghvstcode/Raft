@@ -21,13 +21,13 @@ func (pp *Proxy) AppendEntries(args AppendEntriesArgs, res *AppendEntriesReply) 
 func (cm *CnsModule) RequestVote(args RVArgs, res *RVResults) error {
 	//cm.mu.Lock()
 	//defer cm.mu.Unlock()
-	term, state := cm.GetState()
-	if state == Dead {
+	//term, state := cm.GetState()
+	if cm.State == Dead {
 		return nil
 	}
 
-	if args.Term > term {
-		fmt.Println("become follower", args.Term, term)
+	if args.Term > cm.CurrentTerm {
+		fmt.Println("become follower", args.Term, cm.CurrentTerm)
 		// Become follower
 		cm.setState(Follower, args.Term, -1)
 
@@ -35,7 +35,7 @@ func (cm *CnsModule) RequestVote(args RVArgs, res *RVResults) error {
 	res.VoteGranted = false
 	//fmt.Println("VOTEDFOR", cm.VotedFor)
 	cm.mu.Lock()
-	if term == args.Term &&
+	if cm.CurrentTerm == args.Term &&
 		(cm.VotedFor == -1 || cm.VotedFor == args.CandidateID) {
 
 		res.VoteGranted = true
@@ -52,7 +52,7 @@ func (cm *CnsModule) RequestVote(args RVArgs, res *RVResults) error {
 	//	}
 	//}
 
-	res.Term = term
+	res.Term = cm.CurrentTerm
 	fmt.Println("RESTERM", res.Term)
 	return nil
 }
