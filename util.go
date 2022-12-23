@@ -25,7 +25,7 @@ func make_config(t *testing.T, n int) *config {
 	runtime.GOMAXPROCS(4)
 	cfg := &config{}
 	cfg.t = t
-	cfg.cluster = make([]*Server, n)
+	sv := make([]*Server, n)
 	cfg.n = n
 	ready := make(chan interface{})
 	cfg.connected = make(map[int]bool)
@@ -39,8 +39,8 @@ func make_config(t *testing.T, n int) *config {
 			}
 		}
 
-		cfg.cluster[i] = NewServer(i, peerIds, ready)
-		cfg.cluster[i].Serve()
+		sv[i] = NewServer(i, peerIds, ready)
+		sv[i].Serve()
 
 	}
 
@@ -48,13 +48,13 @@ func make_config(t *testing.T, n int) *config {
 	for i := 0; i < n; i++ {
 		for j := 0; j < n; j++ {
 			if i != j {
-				cfg.cluster[i].ConnectToPeer(j, cfg.cluster[j].GetListenAddr())
+				sv[i].ConnectToPeer(j, sv[j].GetListenAddr())
 			}
 		}
 		cfg.connected[i] = true
 	}
 	close(ready)
-
+	cfg.cluster = sv
 	return cfg
 }
 
@@ -66,9 +66,28 @@ func (cfg *config) checkOneLeader() int {
 		leaders := make(map[int][]int)
 		for i := 0; i < cfg.n; i++ {
 			if cfg.connected[i] {
+				//fmt.Println("connected69")
+				//fmt.Println("cfg.cluster[i]", cfg.cluster[i].cm)
+				//term, leader := cfg.cluster[i].cm.IsLeader()
+				//cm := cfg.cluster[i].cm.
+				//lck := cm.mu.TryLock()
+				//
+				//term := cm.CurrentTerm
+				//leader := cm.State == Leader
+				//if lck {
+				//	fmt.Println("Was locked up")
+				//	cm.mu.Unlock()
+				//}
+				//fmt.Println("Terrm", term)
+				//fmt.Println("Leader", leader)
+				//if term, leader := cfg.cluster[i].cm.IsLeader(); leader {
+				//	leaders[term] = append(leaders[term], i)
+				//}
 				if term, leader := cfg.cluster[i].cm.IsLeader(); leader {
+					//fmt.Println("leader")
 					leaders[term] = append(leaders[term], i)
 				}
+				//fmt.Println("iter", i)
 			}
 		}
 

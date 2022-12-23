@@ -98,14 +98,20 @@ func (s *Server) Call(id int, service string, args interface{}, res interface{})
 	s.mu.Lock()
 	peer := s.peers[id]
 	s.mu.Unlock()
-
+	//fmt.Println("STHHHH101")
 	// If this is called after shutdown (where client.Close is called), it will
 	// return an error.
 	if peer == nil {
 		return fmt.Errorf("call client %d after it's closed", id)
 	} else {
-		return peer.Call(service, args, res)
+		if err := peer.Call(service, args, res); err != nil {
+			fmt.Println("ERRR", err)
+			return err
+		}
+
 	}
+
+	return nil
 }
 
 func (s *Server) DisconnectAllPeers() {
@@ -137,6 +143,7 @@ func NewServer(serverID int, peerIds []int, ready <-chan interface{}) *Server {
 	s.peers = make(map[int]*rpc.Client)
 	s.ready = ready
 	s.quit = make(chan interface{})
+	//s.cm = NewConsensusModule(s.me, s.peerIds, s, s.ready)
 	//s.cm
 	return s
 }
