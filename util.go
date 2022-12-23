@@ -66,28 +66,9 @@ func (cfg *config) checkOneLeader() int {
 		leaders := make(map[int][]int)
 		for i := 0; i < cfg.n; i++ {
 			if cfg.connected[i] {
-				//fmt.Println("connected69")
-				//fmt.Println("cfg.cluster[i]", cfg.cluster[i].cm)
-				//term, leader := cfg.cluster[i].cm.IsLeader()
-				//cm := cfg.cluster[i].cm.
-				//lck := cm.mu.TryLock()
-				//
-				//term := cm.CurrentTerm
-				//leader := cm.State == Leader
-				//if lck {
-				//	fmt.Println("Was locked up")
-				//	cm.mu.Unlock()
-				//}
-				//fmt.Println("Terrm", term)
-				//fmt.Println("Leader", leader)
-				//if term, leader := cfg.cluster[i].cm.IsLeader(); leader {
-				//	leaders[term] = append(leaders[term], i)
-				//}
 				if term, leader := cfg.cluster[i].cm.IsLeader(); leader {
-					//fmt.Println("leader")
 					leaders[term] = append(leaders[term], i)
 				}
-				//fmt.Println("iter", i)
 			}
 		}
 
@@ -153,5 +134,39 @@ func (cfg *config) cleanup() {
 func (cfg *config) begin(description string) {
 	fmt.Printf("%s ...\n", description)
 	cfg.t0 = time.Now()
+}
 
+func (cfg *config) DisconnectPeer(id int) {
+	cfg.cluster[id].DisconnectAllPeers()
+	for j := 0; j < cfg.n; j++ {
+		if j != id {
+			cfg.cluster[j].DisconnectPeer(id)
+		}
+	}
+	cfg.connected[id] = false
+}
+
+func (cfg *config) CheckNoLeader() {
+	for i := 0; i < cfg.n; i++ {
+		if cfg.connected[i] {
+			_, isLeader := cfg.cluster[i].cm.IsLeader()
+			if isLeader {
+				cfg.t.Fatalf("server %d leader; want none", i)
+			}
+		}
+	}
+}
+
+func (cfg *config) ReconnectPeer(id int) {
+	for j := 0; j < cfg.n; j++ {
+		if j != id {
+			if err := cfg.cluster[id].ConnectToPeer(j, cfg.cluster[j].GetListenAddr()); err != nil {
+				cfg.t.Fatal(err)
+			}
+			if err := cfg.cluster[j].ConnectToPeer(id, cfg.cluster[id].GetListenAddr()); err != nil {
+				cfg.t.Fatal(err)
+			}
+		}
+	}
+	cfg.connected[id] = true
 }

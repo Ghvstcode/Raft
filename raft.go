@@ -25,11 +25,6 @@ const (
 	Dead
 )
 
-//type IcnsModule interface {
-//	GetState() (int, RftState)
-//	IsLeader() (int, bool)
-//}
-
 func (s RftState) String() string {
 	switch s {
 	case Follower:
@@ -76,6 +71,7 @@ type CnsModule struct {
 	lastElectionReset time.Time
 	iserver           IServer
 }
+
 type AppendEntriesArgs struct {
 	// Term is the leaders current term
 	Term int
@@ -90,6 +86,7 @@ type AppendEntriesArgs struct {
 	// LeaderCommit is the leaders CommitIndex
 	LeaderCommit int
 }
+
 type AppendEntriesReply struct {
 	// currentTerm, for leader to update itself
 	Term int
@@ -275,6 +272,7 @@ func (cm *CnsModule) setState(state RftState, term, votedFor int) {
 // RpcCallOrFollower is a method that makes an RPC call to the provided method and becomes a folower if the
 // Term gotten from the response(CurrentTerm) is different from the starting Term before the RPC call was made
 func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service string, args interface{}, res interface{}) error {
+	fmt.Println("RPCCALL", service)
 	if err := cm.iserver.Call(id, service, args, res); err == nil {
 		_, currentState := cm.GetState()
 		if currentState != state {
