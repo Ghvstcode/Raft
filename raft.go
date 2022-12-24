@@ -172,7 +172,6 @@ func (cm *CnsModule) electionTimeout() time.Duration {
 // ticker runs in the background of each follow to be able to start an election if it does not..
 // receive a heartbeat in time
 func (cm *CnsModule) ticker() {
-	fmt.Println("ticker1")
 	for cm.isAlive() == false {
 		electionTimeout := cm.electionTimeout()
 		startingTerm, _ := cm.GetState()
@@ -181,7 +180,6 @@ func (cm *CnsModule) ticker() {
 		defer ticker.Stop()
 		for {
 			<-ticker.C
-			fmt.Println("ticker2")
 			currentTerm, isLeader := cm.IsLeader()
 			if isLeader {
 				// TODO add log here
@@ -197,9 +195,7 @@ func (cm *CnsModule) ticker() {
 
 			// Start the election at this point
 			cm.mu.Lock()
-			//fmt.Println("ELECTCHECK?", time.Since(cm.lastElectionReset) >= electionTimeout)
 			if time.Since(cm.lastElectionReset) >= electionTimeout {
-				fmt.Println(" I AM STARTING AN ELECTION")
 				cm.mu.Unlock()
 				cm.runElection()
 
