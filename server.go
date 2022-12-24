@@ -95,6 +95,7 @@ func (s *Server) ConnectToPeer(peerId int, addr net.Addr) error {
 }
 
 func (s *Server) Call(id int, service string, args interface{}, res interface{}) error {
+	//fmt.Println("call", service)
 	s.mu.Lock()
 	peer := s.peers[id]
 	s.mu.Unlock()

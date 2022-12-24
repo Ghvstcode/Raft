@@ -172,6 +172,7 @@ func (cm *CnsModule) electionTimeout() time.Duration {
 // ticker runs in the background of each follow to be able to start an election if it does not..
 // receive a heartbeat in time
 func (cm *CnsModule) ticker() {
+	fmt.Println("ticker1")
 	for cm.isAlive() == false {
 		electionTimeout := cm.electionTimeout()
 		startingTerm, _ := cm.GetState()
@@ -180,7 +181,7 @@ func (cm *CnsModule) ticker() {
 		defer ticker.Stop()
 		for {
 			<-ticker.C
-
+			fmt.Println("ticker2")
 			currentTerm, isLeader := cm.IsLeader()
 			if isLeader {
 				// TODO add log here
@@ -196,7 +197,9 @@ func (cm *CnsModule) ticker() {
 
 			// Start the election at this point
 			cm.mu.Lock()
+			//fmt.Println("ELECTCHECK?", time.Since(cm.lastElectionReset) >= electionTimeout)
 			if time.Since(cm.lastElectionReset) >= electionTimeout {
+				fmt.Println(" I AM STARTING AN ELECTION")
 				cm.mu.Unlock()
 				cm.runElection()
 
@@ -239,6 +242,7 @@ func (cm *CnsModule) requestVote(peerID, term, votes, candidate int) {
 	// TODO add log here
 	if err := cm.RpcCallOrFollower(Candidate, peerID, term, "CnsModule.RequestVote", q, &res); err != nil {
 		//TODO LOG ERROR
+		fmt.Println("ERR245", err)
 		return
 	}
 
@@ -267,12 +271,14 @@ func (cm *CnsModule) setState(state RftState, term, votedFor int) {
 	cm.VotedFor = votedFor
 	cm.lastElectionReset = time.Now()
 	cm.mu.Unlock()
+
+	go cm.ticker()
 }
 
 // RpcCallOrFollower is a method that makes an RPC call to the provided method and becomes a folower if the
 // Term gotten from the response(CurrentTerm) is different from the starting Term before the RPC call was made
 func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service string, args interface{}, res interface{}) error {
-	fmt.Println("RPCCALL", service)
+	//fmt.Println("RPCCALL", service)
 	if err := cm.iserver.Call(id, service, args, res); err == nil {
 		_, currentState := cm.GetState()
 		if currentState != state {

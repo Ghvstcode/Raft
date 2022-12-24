@@ -66,7 +66,8 @@ func (cfg *config) checkOneLeader() int {
 		leaders := make(map[int][]int)
 		for i := 0; i < cfg.n; i++ {
 			if cfg.connected[i] {
-				if term, leader := cfg.cluster[i].cm.IsLeader(); leader {
+				term, leader := cfg.cluster[i].cm.IsLeader()
+				if leader {
 					leaders[term] = append(leaders[term], i)
 				}
 			}

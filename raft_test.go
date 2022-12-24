@@ -1,7 +1,6 @@
 package raft
 
 import (
-	"fmt"
 	"testing"
 	"time"
 )
@@ -45,13 +44,11 @@ func TestReElection(t *testing.T) {
 	cfg.begin("Test (2A): election after network failure")
 
 	leader1 := cfg.checkOneLeader()
-	fmt.Println("LEADER FOUND!!!!!")
+
 	// if the leader disconnects, a new one should be elected.
 	cfg.DisconnectPeer(leader1)
-	fmt.Println("DISCONNECTED!!!!!")
-	time.Sleep(2 * RaftElectionTimeout)
+
 	cfg.checkOneLeader()
-	fmt.Println("ln48", leader1)
 
 	// if the old leader rejoins, that shouldn't
 	// disturb the new leader. and the old leader

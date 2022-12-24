@@ -42,16 +42,16 @@ func (cm *CnsModule) RequestVote(args RVArgs, res *RVResults) error {
 }
 
 func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesReply) error {
-	term, state := cm.GetState()
-	if state == Dead {
+	//term, state := cm.GetState()
+	if cm.State == Dead {
 		return nil
 	}
-	if args.Term > term {
+	if args.Term > cm.CurrentTerm {
 		cm.setState(Follower, args.Term, -1)
 	}
 	res.Success = false
-	if args.Term == term {
-		if state != Follower {
+	if args.Term == cm.CurrentTerm {
+		if cm.State != Follower {
 			// Become follower
 			cm.setState(Follower, args.Term, -1)
 		}
@@ -61,6 +61,6 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesRep
 		cm.mu.Unlock()
 		res.Success = true
 	}
-	res.Term = term
+	res.Term = cm.CurrentTerm
 	return nil
 }
