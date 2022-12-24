@@ -295,7 +295,14 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 		if currentState != state {
 			return errors.New(fmt.Sprintf("expected state %s but got state %s", state, currentState))
 		}
+		fmt.Println(service)
+		if service == "CnsModule.AppendEntries" {
+			v0, _ := args.(AppendEntriesArgs)
 
+			fmt.Println("VZEROOOO", v0)
+
+		}
+		//fmt.Println("VZEROOOO-NOHIT", service)
 		v0, ok := res.(AppendEntriesArgs)
 		if ok {
 			fmt.Println("VZEROOOO", v0)
@@ -321,11 +328,14 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 	return nil
 }
 
-func (cm *CnsModule) appendOps(res AppendEntriesReply, savedTerm int) {
+func (cm *CnsModule) appendOps(res AppendEntriesReply, savedTerm, id int, args interface{}) {
 	cm.mu.Lock()
 	if cm.State == Leader && savedTerm == res.Term {
 		if res.Success {
-
+			if v0, ok := args.(AppendEntriesArgs); ok {
+				cm.NextIndex[id] = cm.NextIndex[id] + len(v0.Entries)
+				cm.MatchIndex[id] = cm.NextIndex[id] - 1
+			}
 		}
 	}
 }
@@ -350,7 +360,7 @@ func (cm *CnsModule) sendLeaderHeartbeats() {
 			Entries:      cm.Log[nextIdx:],
 			LeaderCommit: cm.CommitIndex,
 		}
-
+		cm.mu.Unlock()
 		var res AppendEntriesReply
 		go cm.RpcCallOrFollower(Follower, peer, savedTerm, "CnsModule.AppendEntries", q, &res)
 	}
