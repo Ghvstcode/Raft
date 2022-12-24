@@ -18,11 +18,12 @@ func (pp *Proxy) AppendEntries(args AppendEntriesArgs, res *AppendEntriesReply) 
 }
 
 func (cm *CnsModule) RequestVote(args RVArgs, res *RVResults) error {
-	if cm.State == Dead {
+	term, state := cm.GetState()
+	if state == Dead {
 		return nil
 	}
 
-	if args.Term > cm.CurrentTerm {
+	if args.Term > term {
 		cm.setState(Follower, args.Term, -1)
 	}
 
@@ -35,23 +36,24 @@ func (cm *CnsModule) RequestVote(args RVArgs, res *RVResults) error {
 		cm.VotedFor = args.CandidateID
 		cm.lastElectionReset = time.Now()
 	}
-	cm.mu.Unlock()
 
 	res.Term = cm.CurrentTerm
+	cm.mu.Unlock()
 	return nil
 }
 
 func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesReply) error {
-	//term, state := cm.GetState()
-	if cm.State == Dead {
+	term, state := cm.GetState()
+	if state == Dead {
 		return nil
 	}
-	if args.Term > cm.CurrentTerm {
+	if args.Term > term {
 		cm.setState(Follower, args.Term, -1)
 	}
+
 	res.Success = false
-	if args.Term == cm.CurrentTerm {
-		if cm.State != Follower {
+	if args.Term == term {
+		if state != Follower {
 			// Become follower
 			cm.setState(Follower, args.Term, -1)
 		}
@@ -61,6 +63,7 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesRep
 		cm.mu.Unlock()
 		res.Success = true
 	}
-	res.Term = cm.CurrentTerm
+
+	res.Term = term
 	return nil
 }

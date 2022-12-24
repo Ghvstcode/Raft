@@ -2,6 +2,7 @@ package raft
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 )
@@ -73,6 +74,39 @@ func TestReElection(t *testing.T) {
 
 	// re-join of last node shouldn't prevent leader from existing.
 	cfg.ReconnectPeer(leader2)
+	cfg.checkOneLeader()
+
+	cfg.end()
+}
+
+func TestManyElections2A(t *testing.T) {
+	servers := 7
+	cfg := make_config(t, servers)
+	defer cfg.cleanup()
+
+	cfg.begin("Test (2A): multiple elections")
+
+	cfg.checkOneLeader()
+
+	iters := 10
+	for ii := 1; ii < iters; ii++ {
+		// disconnect three nodes
+		i1 := rand.Int() % servers
+		i2 := rand.Int() % servers
+		i3 := rand.Int() % servers
+		cfg.DisconnectPeer(i1)
+		cfg.DisconnectPeer(i2)
+		cfg.DisconnectPeer(i3)
+
+		// either the current leader should still be alive,
+		// or the remaining four should elect a new one.
+		cfg.checkOneLeader()
+
+		cfg.ReconnectPeer(i1)
+		cfg.ReconnectPeer(i2)
+		cfg.ReconnectPeer(i3)
+	}
+
 	cfg.checkOneLeader()
 
 	cfg.end()

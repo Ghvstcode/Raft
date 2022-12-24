@@ -12,7 +12,16 @@ import (
 // LogEntry represents a log entry.
 // It holds information about the term when the entry was received by the leader
 // it contains command for the state machine
-type LogEntry struct{}
+type LogEntry struct {
+	Command interface{}
+	Term    int
+}
+
+type CommitEntry struct {
+	Command interface{}
+	Term    int
+	Idx     int
+}
 
 // Persistence dummy struct
 type Persistence struct{}
@@ -70,6 +79,11 @@ type CnsModule struct {
 	// TODO refactor this bit
 	lastElectionReset time.Time
 	iserver           IServer
+	// Volatile state on all leaders
+	// NextIndex for each server, is the index of the next log entry to send to that server (initialized to leader
+	//last log index + 1)
+	NextIndex  map[int]int
+	MatchIndex map[int]int
 }
 
 type AppendEntriesArgs struct {
@@ -122,6 +136,8 @@ func NewConsensusModule(id int, peerIds []int, server *Server, ready <-chan inte
 	cm.iserver = server
 	cm.State = Follower
 	cm.VotedFor = -1
+	cm.NextIndex = make(map[int]int)
+	cm.MatchIndex = make(map[int]int)
 
 	go func() {
 		<-ready
@@ -238,7 +254,7 @@ func (cm *CnsModule) requestVote(peerID, term, votes, candidate int) {
 	// TODO add log here
 	if err := cm.RpcCallOrFollower(Candidate, peerID, term, "CnsModule.RequestVote", q, &res); err != nil {
 		//TODO LOG ERROR
-		fmt.Println("ERR245", err)
+		//fmt.Println("ERR245", err)
 		return
 	}
 
@@ -274,11 +290,15 @@ func (cm *CnsModule) setState(state RftState, term, votedFor int) {
 // RpcCallOrFollower is a method that makes an RPC call to the provided method and becomes a folower if the
 // Term gotten from the response(CurrentTerm) is different from the starting Term before the RPC call was made
 func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service string, args interface{}, res interface{}) error {
-	//fmt.Println("RPCCALL", service)
 	if err := cm.iserver.Call(id, service, args, res); err == nil {
 		_, currentState := cm.GetState()
 		if currentState != state {
 			return errors.New(fmt.Sprintf("expected state %s but got state %s", state, currentState))
+		}
+
+		v0, ok := res.(AppendEntriesArgs)
+		if ok {
+			fmt.Println("VZEROOOO", v0)
 		}
 		v, ok := res.(RVResults)
 		if ok {
@@ -301,6 +321,15 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 	return nil
 }
 
+func (cm *CnsModule) appendOps(res AppendEntriesReply, savedTerm int) {
+	cm.mu.Lock()
+	if cm.State == Leader && savedTerm == res.Term {
+		if res.Success {
+
+		}
+	}
+}
+
 func (cm *CnsModule) sendLeaderHeartbeats() {
 	cm.mu.Lock()
 	savedTerm := cm.CurrentTerm
@@ -309,10 +338,17 @@ func (cm *CnsModule) sendLeaderHeartbeats() {
 		return
 	}
 	cm.mu.Unlock()
+
 	for _, peer := range cm.Peers {
+		cm.mu.Lock()
+		nextIdx := cm.NextIndex[peer]
 		q := AppendEntriesArgs{
-			LeaderID: cm.Me,
-			Term:     savedTerm,
+			Term:         savedTerm,
+			LeaderID:     cm.Me,
+			PrevLogIndex: nextIdx - 1,
+			PrevLogTerm:  -1,
+			Entries:      cm.Log[nextIdx:],
+			LeaderCommit: cm.CommitIndex,
 		}
 
 		var res AppendEntriesReply
@@ -324,6 +360,15 @@ func (cm *CnsModule) LeaderOps() {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	cm.State = Leader
+
+	// When a server becomes a leader, it needs to track the next index for any new commands
+	// the next index is the location of any new entries to the server
+	// For a server with No-logs, it becomes 0
+	for _, peerId := range cm.Peers {
+		cm.NextIndex[peerId] = len(cm.Log)
+		cm.MatchIndex[peerId] = -1
+	}
+
 	go func() {
 		ticker := time.NewTicker(50 * time.Millisecond)
 		defer ticker.Stop()
@@ -337,4 +382,18 @@ func (cm *CnsModule) LeaderOps() {
 			}
 		}
 	}()
+}
+
+func (cm *CnsModule) Submit(command interface{}) bool {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+	_, state := cm.GetState()
+	//cm.dlog("Submit received by %v: %v", cm.state, command)
+	if state == Leader {
+		cm.mu.Lock()
+		cm.Log = append(cm.Log, LogEntry{Command: command, Term: cm.CurrentTerm})
+		cm.mu.Unlock()
+		return true
+	}
+	return false
 }
