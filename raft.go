@@ -82,8 +82,10 @@ type CnsModule struct {
 	// Volatile state on all leaders
 	// NextIndex for each server, is the index of the next log entry to send to that server (initialized to leader
 	//last log index + 1)
-	NextIndex  map[int]int
-	MatchIndex map[int]int
+	NextIndex          map[int]int
+	MatchIndex         map[int]int
+	newCommitReadyChan chan struct{}
+	CommitExecChan     chan<- CommitEntry
 }
 
 type AppendEntriesArgs struct {
@@ -129,15 +131,19 @@ type RVResults struct {
 	VoteGranted bool
 }
 
-func NewConsensusModule(id int, peerIds []int, server *Server, ready <-chan interface{}) *CnsModule {
+func NewConsensusModule(id int, peerIds []int, server *Server, ready <-chan interface{}, cme chan<- CommitEntry) *CnsModule {
 	cm := new(CnsModule)
 	cm.Me = id
 	cm.Peers = peerIds
 	cm.iserver = server
 	cm.State = Follower
 	cm.VotedFor = -1
+	cm.LastApplied = -1
+	cm.CommitIndex = -1
 	cm.NextIndex = make(map[int]int)
 	cm.MatchIndex = make(map[int]int)
+	cm.newCommitReadyChan = make(chan struct{}, 16)
+	cm.CommitExecChan = cme
 
 	go func() {
 		<-ready
@@ -335,6 +341,52 @@ func (cm *CnsModule) appendOps(res AppendEntriesReply, savedTerm, id int, args i
 			if v0, ok := args.(AppendEntriesArgs); ok {
 				cm.NextIndex[id] = cm.NextIndex[id] + len(v0.Entries)
 				cm.MatchIndex[id] = cm.NextIndex[id] - 1
+
+				saveCmIdx := cm.CommitIndex
+
+				for i := cm.CommitIndex + 1; i < len(cm.Log); i++ {
+					if cm.Log[i].Term == cm.CurrentTerm {
+						matchCount := 1
+						for _, peerId := range cm.Peers {
+							if cm.MatchIndex[peerId] >= i {
+								matchCount++
+							}
+						}
+						if matchCount*2 > len(cm.Peers)+1 {
+							cm.CommitIndex = i
+						}
+
+						if cm.CommitIndex != saveCmIdx {
+							cm.newCommitReadyChan <- struct{}{}
+						}
+					} else {
+						cm.NextIndex[id] = v0.PrevLogIndex - 2
+					}
+
+				}
+			}
+		}
+	}
+}
+
+func (cm *CnsModule) commitChanSender() {
+	for range cm.newCommitReadyChan {
+		// Find which entries we have to apply.
+		cm.mu.Lock()
+		savedTerm := cm.CurrentTerm
+		savedLastApplied := cm.LastApplied
+		var entries []LogEntry
+		if cm.CommitIndex > cm.LastApplied {
+			entries = cm.Log[cm.LastApplied+1 : cm.CommitIndex+1]
+			cm.LastApplied = cm.CommitIndex
+		}
+		cm.mu.Unlock()
+
+		for i, entry := range entries {
+			cm.CommitExecChan <- CommitEntry{
+				Command: entry.Command,
+				Idx:     savedLastApplied + i + 1,
+				Term:    savedTerm,
 			}
 		}
 	}
