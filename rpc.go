@@ -42,6 +42,7 @@ func (cm *CnsModule) RequestVote(args RVArgs, res *RVResults) error {
 	}
 
 	res.Term = cm.CurrentTerm
+	cm.persistToStorage()
 	cm.mu.Unlock()
 	return nil
 }
@@ -114,6 +115,7 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesRep
 	}
 
 	res.Term = term
+	cm.persistToStorage()
 	return nil
 }
 

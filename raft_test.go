@@ -254,3 +254,20 @@ func TestNoCommitWithNoQuorum(t *testing.T) {
 		cfg.CheckCommittedN(v, 3)
 	}
 }
+
+func TestCrashFollower(t *testing.T) {
+	servers := 3
+	cfg := make_config(t, servers)
+	defer cfg.cleanup()
+
+	origLeaderId := cfg.checkOneLeader()
+	cfg.SubmitToServer(origLeaderId, 5)
+
+	time.Sleep(350 * time.Millisecond)
+	cfg.CheckCommittedN(5, 3)
+
+	cfg.CrashPeer((origLeaderId + 1) % 3)
+	time.Sleep(350 * time.Millisecond)
+	cfg.CheckCommittedN(5, 2)
+}
+

@@ -31,6 +31,7 @@ type Server struct {
 	rpcServer  *rpc.Server
 	rpcProxy   interface{}
 	commitChan chan<- CommitEntry
+	storage    Persistence
 }
 
 func (s *Server) GetListenAddr() net.Addr {
@@ -39,7 +40,7 @@ func (s *Server) GetListenAddr() net.Addr {
 
 func (s *Server) Serve() {
 	s.mu.Lock()
-	s.cm = NewConsensusModule(s.me, s.peerIds, s, s.ready, s.commitChan)
+	s.cm = NewConsensusModule(s.me, s.peerIds, s, s.ready, s.commitChan, s.storage)
 
 	// Create a new RPC server and register a RPCProxy that forwards all methods
 	// to n.cm
@@ -139,7 +140,7 @@ func (s *Server) DisconnectPeer(peerId int) error {
 	return nil
 }
 
-func NewServer(serverID int, peerIds []int, ready <-chan interface{}, commitChan chan<- CommitEntry) *Server {
+func NewServer(serverID int, peerIds []int, ready <-chan interface{}, commitChan chan<- CommitEntry, kv Persistence) *Server {
 	s := new(Server)
 	s.me = serverID
 	s.peerIds = peerIds
@@ -147,6 +148,7 @@ func NewServer(serverID int, peerIds []int, ready <-chan interface{}, commitChan
 	s.ready = ready
 	s.quit = make(chan interface{})
 	s.commitChan = commitChan
+	s.storage = kv
 	//s.cm = NewConsensusModule(s.me, s.peerIds, s, s.ready)
 	//s.cm
 	return s

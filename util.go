@@ -23,6 +23,7 @@ type config struct {
 	logs        []map[int]interface{}
 	commitChans []chan CommitEntry
 	commits     [][]CommitEntry
+	storage     []*KvStore
 }
 
 func make_config(t *testing.T, n int) *config {
@@ -34,7 +35,7 @@ func make_config(t *testing.T, n int) *config {
 	ready := make(chan interface{})
 	cfg.connected = make(map[int]bool)
 	cfg.logs = make([]map[int]interface{}, cfg.n)
-
+	storage := make([]*KvStore, n)
 	commitChans := make([]chan CommitEntry, n)
 	commits := make([][]CommitEntry, n)
 
@@ -47,8 +48,9 @@ func make_config(t *testing.T, n int) *config {
 			}
 		}
 
+		storage[i] = NewStorage()
 		commitChans[i] = make(chan CommitEntry)
-		sv[i] = NewServer(i, peerIds, ready, commitChans[i])
+		sv[i] = NewServer(i, peerIds, ready, commitChans[i], storage[i])
 		sv[i].Serve()
 
 	}
@@ -67,6 +69,7 @@ func make_config(t *testing.T, n int) *config {
 	cfg.cluster = sv
 	cfg.commitChans = commitChans
 	cfg.commits = commits
+	cfg.storage = storage
 
 	for i := 0; i < n; i++ {
 		go cfg.collectCommits(i)
@@ -379,4 +382,14 @@ func (cfg *config) CheckNotCommitted(cmd int) {
 			}
 		}
 	}
+}
+
+func (cfg *config) CrashPeer(id int) {
+	cfg.DisconnectPeer(id)
+	cfg.connected[id] = false
+	cfg.cluster[id].DisconnectAllPeers()
+
+	cfg.mu.Lock()
+	cfg.commits[id] = cfg.commits[id][:0]
+	cfg.mu.Unlock()
 }

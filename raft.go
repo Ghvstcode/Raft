@@ -1,8 +1,11 @@
 package raft
 
 import (
+	"bytes"
+	"encoding/gob"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"reflect"
 	"sync"
@@ -24,7 +27,14 @@ type CommitEntry struct {
 }
 
 // Persistence dummy struct
-type Persistence struct{}
+type Persistence interface {
+	Set(key string, value []byte)
+
+	Get(key string) ([]byte, bool)
+
+	IsSet() bool
+}
+
 type RftState int
 
 const (
@@ -131,12 +141,13 @@ type RVResults struct {
 	VoteGranted bool
 }
 
-func NewConsensusModule(id int, peerIds []int, server *Server, ready <-chan interface{}, cme chan<- CommitEntry) *CnsModule {
+func NewConsensusModule(id int, peerIds []int, server *Server, ready <-chan interface{}, cme chan<- CommitEntry, kv Persistence) *CnsModule {
 	cm := new(CnsModule)
 	cm.Me = id
 	cm.Peers = peerIds
 	cm.iserver = server
 	cm.State = Follower
+	cm.Persistence = kv
 	cm.VotedFor = -1
 	cm.LastApplied = -1
 	cm.CommitIndex = -1
@@ -144,6 +155,10 @@ func NewConsensusModule(id int, peerIds []int, server *Server, ready <-chan inte
 	cm.MatchIndex = make(map[int]int)
 	cm.newCommitReadyChan = make(chan struct{}, 16)
 	cm.CommitExecChan = cme
+
+	if cm.Persistence.IsSet() {
+		cm.restoreFromStorage()
+	}
 
 	go func() {
 		<-ready
@@ -439,7 +454,7 @@ func (cm *CnsModule) sendLeaderHeartbeats() {
 			Entries:      entries,
 			LeaderCommit: cm.CommitIndex,
 		}
-		
+
 		cm.mu.Unlock()
 		var res AppendEntriesReply
 		go cm.RpcCallOrFollower(Follower, peer, savedTerm, "CnsModule.AppendEntries", q, &res)
@@ -484,9 +499,57 @@ func (cm *CnsModule) Submit(command interface{}) bool {
 	if state == Leader {
 		//fmt.Println("submit to leader-certain", cm.Log)
 		cm.mu.Lock()
+		cm.persistToStorage()
 		cm.Log = append(cm.Log, LogEntry{Command: command, Term: cm.CurrentTerm})
 		cm.mu.Unlock()
 		return true
 	}
 	return false
+}
+
+func (cm *CnsModule) restoreFromStorage() {
+	if termData, found := cm.Persistence.Get("currentTerm"); found {
+		d := gob.NewDecoder(bytes.NewBuffer(termData))
+		if err := d.Decode(&cm.CurrentTerm); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		log.Fatal("currentTerm not found in storage")
+	}
+	if votedData, found := cm.Persistence.Get("votedFor"); found {
+		d := gob.NewDecoder(bytes.NewBuffer(votedData))
+		if err := d.Decode(&cm.VotedFor); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		log.Fatal("votedFor not found in storage")
+	}
+	if logData, found := cm.Persistence.Get("log"); found {
+		d := gob.NewDecoder(bytes.NewBuffer(logData))
+		if err := d.Decode(&cm.Log); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		log.Fatal("log not found in storage")
+	}
+}
+
+func (cm *CnsModule) persistToStorage() {
+	var termData bytes.Buffer
+	if err := gob.NewEncoder(&termData).Encode(cm.CurrentTerm); err != nil {
+		log.Fatal(err)
+	}
+	cm.Persistence.Set("currentTerm", termData.Bytes())
+
+	var votedData bytes.Buffer
+	if err := gob.NewEncoder(&votedData).Encode(cm.VotedFor); err != nil {
+		log.Fatal(err)
+	}
+	cm.Persistence.Set("votedFor", votedData.Bytes())
+
+	var logData bytes.Buffer
+	if err := gob.NewEncoder(&logData).Encode(cm.Log); err != nil {
+		log.Fatal(err)
+	}
+	cm.Persistence.Set("log", logData.Bytes())
 }
