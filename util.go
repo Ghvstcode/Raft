@@ -115,7 +115,6 @@ func (cfg *config) checkOneLeader() int {
 		}
 	}
 
-	fmt.Println("test ln 103")
 	cfg.t.Fatalf("expected one leader, got none")
 	return -1
 }
@@ -295,7 +294,6 @@ func (cfg *config) checkFinished() bool {
 }
 
 func (cfg *config) SubmitToServer(id int, cmd interface{}) bool {
-	fmt.Println("submit to server")
 	return cfg.cluster[id].cm.Submit(cmd)
 }
 
@@ -306,7 +304,7 @@ func (cfg *config) CheckCommittedN(cmd int, n int) {
 	}
 }
 
-func (cfg *config) CheckCommitted(cmd int) (interface{}, interface{}) {
+func (cfg *config) CheckCommitted(cmd int) (int, int) {
 	cfg.mu.Lock()
 	defer cfg.mu.Unlock()
 
@@ -325,7 +323,6 @@ func (cfg *config) CheckCommitted(cmd int) (interface{}, interface{}) {
 			}
 		}
 
-		fmt.Println("connected-test-lvl", commitsLen)
 	}
 
 	// Check consistency of commits from the start and to the command we're asked
@@ -366,4 +363,20 @@ func (cfg *config) CheckCommitted(cmd int) (interface{}, interface{}) {
 	// for.
 	cfg.t.Errorf("cmd=%d not found in commits", cmd)
 	return -1, -1
+}
+
+func (cfg *config) CheckNotCommitted(cmd int) {
+	cfg.mu.Lock()
+	defer cfg.mu.Unlock()
+
+	for i := 0; i < cfg.n; i++ {
+		if cfg.connected[i] {
+			for c := 0; c < len(cfg.commits[i]); c++ {
+				gotCmd := cfg.commits[i][c].Command.(int)
+				if gotCmd == cmd {
+					cfg.t.Errorf("found %d at commits[%d][%d], expected none", cmd, i, c)
+				}
+			}
+		}
+	}
 }

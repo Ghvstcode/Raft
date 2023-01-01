@@ -257,7 +257,6 @@ func (cm *CnsModule) runElection() {
 }
 
 func (cm *CnsModule) requestVote(peerID, term, votes, candidate int) {
-	fmt.Println("requestingvote")
 	lli, llt := cm.getIndexState()
 	var res RVResults
 	q := RVArgs{
@@ -278,7 +277,6 @@ func (cm *CnsModule) requestVote(peerID, term, votes, candidate int) {
 		if res.VoteGranted {
 			nv := votes + 1
 			if nv*2 > len(cm.Peers)+1 {
-				fmt.Println("Starting leader ops")
 				// start leader
 				cm.LeaderOps()
 				return
@@ -309,7 +307,6 @@ func (cm *CnsModule) setState(state RftState, term, votedFor int) {
 func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service string, args interface{}, res interface{}) error {
 	//fmt.Println("RPCALL", service)
 	if err := cm.iserver.Call(id, service, args, res); err == nil {
-		fmt.Println("svc312", service)
 
 		//fmt.Println(service)
 		//if service == "CnsModule.AppendEntries" {
@@ -324,11 +321,9 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 			_, currentState := cm.GetState()
 			if currentState != state {
 
-				fmt.Println("317-cs", currentState, state)
 				return errors.New(fmt.Sprintf("expected state %s but got state %s", state, currentState))
 			}
 
-			fmt.Println("AT LEAST ONEEEEEEE")
 			if v.Term > term {
 				cm.setState(Follower, v.Term, -1)
 				return errors.New("peer has become follower")
@@ -338,14 +333,15 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 		//
 		v2, ok := res.(*AppendEntriesReply)
 		if v2 != nil && ok {
-			fmt.Println("I AM AOK339")
 			if v2.Term > term {
-				fmt.Println("peer has become follower")
-				cm.setState(Follower, v.Term, -1)
+				//if v2 == nil {
+				//	fmt.Println("vusty", v2.Term)
+				//}
+
+				cm.setState(Follower, v2.Term, -1)
 				return errors.New("peer has become follower")
 			}
 
-			//fmt.Println(*v2)
 			cm.appendOps(*v2, term, id, args)
 		}
 	} else {
@@ -355,24 +351,19 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 }
 
 func (cm *CnsModule) appendOps(res AppendEntriesReply, savedTerm, id int, args interface{}) {
-	fmt.Println("append ops")
 	cm.mu.Lock()
 	if cm.State == Leader && savedTerm == res.Term {
-		fmt.Println(cm.State, savedTerm, res.Term)
 		if res.Success {
 			vsth, ok := args.(AppendEntriesArgs)
-			fmt.Println("VSTH", vsth)
 			if ok {
 
 				v0 := vsth
-				fmt.Println("v0", v0)
 				cm.NextIndex[id] = cm.NextIndex[id] + len(v0.Entries)
 				cm.MatchIndex[id] = cm.NextIndex[id] - 1
 
 				saveCmIdx := cm.CommitIndex
 
 				for i := cm.CommitIndex + 1; i < len(cm.Log); i++ {
-					fmt.Println(" tree75")
 					if cm.Log[i].Term == cm.CurrentTerm {
 						matchCount := 1
 						for _, peerId := range cm.Peers {
@@ -385,7 +376,6 @@ func (cm *CnsModule) appendOps(res AppendEntriesReply, savedTerm, id int, args i
 						}
 
 						if cm.CommitIndex != saveCmIdx {
-							fmt.Println(" I made it here 387")
 							cm.newCommitReadyChan <- struct{}{}
 						}
 					} else {
@@ -401,7 +391,7 @@ func (cm *CnsModule) appendOps(res AppendEntriesReply, savedTerm, id int, args i
 
 func (cm *CnsModule) commitChanSender() {
 	for range cm.newCommitReadyChan {
-		fmt.Println("cm.newCommitReadyChan", cm.newCommitReadyChan)
+
 		// Find which entries we have to apply.
 		cm.mu.Lock()
 		savedTerm := cm.CurrentTerm
@@ -412,7 +402,7 @@ func (cm *CnsModule) commitChanSender() {
 			cm.LastApplied = cm.CommitIndex
 		}
 		cm.mu.Unlock()
-		fmt.Println("ENTRIES", entries)
+
 		for i, entry := range entries {
 			cm.CommitExecChan <- CommitEntry{
 				Command: entry.Command,
@@ -437,7 +427,7 @@ func (cm *CnsModule) sendLeaderHeartbeats() {
 		nextIdx := cm.NextIndex[peer]
 		prevLogTerm := -1
 		prevLogIndex := nextIdx - 1
-		if prevLogIndex >= 0 {
+		if prevLogIndex >= 0 && prevLogIndex <= len(cm.Log)-1 {
 			prevLogTerm = cm.Log[prevLogIndex].Term
 		}
 		entries := cm.Log[nextIdx:]
@@ -449,7 +439,7 @@ func (cm *CnsModule) sendLeaderHeartbeats() {
 			Entries:      entries,
 			LeaderCommit: cm.CommitIndex,
 		}
-		//fmt.Println("CMLOGS-427", q.Entries)
+		
 		cm.mu.Unlock()
 		var res AppendEntriesReply
 		go cm.RpcCallOrFollower(Follower, peer, savedTerm, "CnsModule.AppendEntries", q, &res)
@@ -495,7 +485,6 @@ func (cm *CnsModule) Submit(command interface{}) bool {
 		//fmt.Println("submit to leader-certain", cm.Log)
 		cm.mu.Lock()
 		cm.Log = append(cm.Log, LogEntry{Command: command, Term: cm.CurrentTerm})
-		fmt.Println("submit to leader", cm.Log)
 		cm.mu.Unlock()
 		return true
 	}

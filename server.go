@@ -104,11 +104,11 @@ func (s *Server) Call(id int, service string, args interface{}, res interface{})
 	// If this is called after shutdown (where client.Close is called), it will
 	// return an error.
 	if peer == nil {
-		fmt.Printf("call client %d after it's closed", id)
+		//fmt.Printf("call client %d after it's closed", id)
 		return fmt.Errorf("call client %d after it's closed", id)
 	} else {
 		if err := peer.Call(service, args, res); err != nil {
-			fmt.Println("ERRR", err)
+			//fmt.Println("ERRR", err)
 			return err
 		}
 

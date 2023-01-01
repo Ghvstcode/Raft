@@ -1,7 +1,6 @@
 package raft
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -75,7 +74,6 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesRep
 
 		//fmt.Println("AFTER LOCKKKK")
 		cm.lastElectionReset = time.Now()
-		fmt.Println("pREVLOGIDX")
 		if args.PrevLogIndex == -1 ||
 			(args.PrevLogIndex < len(cm.Log) && args.PrevLogTerm == cm.Log[args.PrevLogIndex].Term) {
 
@@ -93,13 +91,12 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesRep
 				}
 				logInsertIndex++
 				newEntriesIndex++
-				fmt.Println("appending95", newEntriesIndex)
 			}
 
 			if newEntriesIndex < len(args.Entries) {
 				cm.Log = append(cm.Log[:logInsertIndex], args.Entries[newEntriesIndex:]...)
 			}
-			fmt.Println("args.LeaderCommit > cm.CommitIndex", args.LeaderCommit, cm.CommitIndex, args.LeaderCommit > cm.CommitIndex)
+			//fmt.Println("args.LeaderCommit > cm.CommitIndex", args.LeaderCommit, cm.CommitIndex, args.LeaderCommit > cm.CommitIndex)
 			if args.LeaderCommit > cm.CommitIndex {
 				min := func(a, b int) int {
 					if a < b {
@@ -108,7 +105,7 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesRep
 					return b
 				}
 				cm.CommitIndex = min(args.LeaderCommit, len(cm.Log)-1)
-				fmt.Println("110-here")
+				//fmt.Println("110-here")
 				cm.newCommitReadyChan <- struct{}{}
 			}
 		}
