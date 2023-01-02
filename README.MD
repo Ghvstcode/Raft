@@ -1,10 +1,10 @@
 # RAFT Consensus Protocol in Golang
 
-Welcome to this project, where I attempt to implementthe RAFT consensus protocol in Go!
+Welcome to this project, where I attempt to implement the RAFT consensus protocol in Go!
 
 ## Why did I do this?
 
-The purpose of this project was purely for my own learning, to gain a deeper understanding of how RAFT works and to get some hands-on experience with implementing distributed systems in Golang. This implementation is not intended to be used in a production project.
+The purpose of this project was purely for my own learning, to gain a deeper understanding of how RAFT works. This implementation is not intended for any sort of production use.
 
 ## What is RAFT?
 
@@ -70,3 +70,5 @@ If you want to learn more about RAFT, here are some places you can look:
 
 ## Conclusion
 - I hope to fine-tune this implementation in the future!
+
+**part of this readme is written with help from ChatGPT **
