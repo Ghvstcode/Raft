@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"reflect"
 	"sync"
 	"time"
 )
@@ -178,13 +177,6 @@ func (cm *CnsModule) isAlive() bool {
 	return cm.dead == 1
 }
 
-const mutexLocked = 1
-
-func MutexLocked(m *sync.Mutex) bool {
-	state := reflect.ValueOf(m).Elem().FieldByName("state")
-	return state.Int()&mutexLocked == mutexLocked
-}
-
 // GetState returns the current term of the specific node and whether it is a  leader
 func (cm *CnsModule) IsLeader() (int, bool) {
 	cm.mu.Lock()
@@ -197,12 +189,6 @@ func (cm *CnsModule) GetState() (int, RftState) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	return cm.CurrentTerm, cm.State
-	//cm.mu.Lock()
-	//ct := cm.CurrentTerm
-	//cms := cm.State
-	////cm.mu.Unlock()
-	//
-	//return ct, cms
 }
 
 func (cm *CnsModule) electionTimeout() time.Duration {
@@ -292,7 +278,6 @@ func (cm *CnsModule) requestVote(peerID, term, votes, candidate int) {
 		if res.VoteGranted {
 			nv := votes + 1
 			if nv*2 > len(cm.Peers)+1 {
-				// start leader
 				cm.LeaderOps()
 				return
 			}
@@ -320,22 +305,11 @@ func (cm *CnsModule) setState(state RftState, term, votedFor int) {
 // RpcCallOrFollower is a method that makes an RPC call to the provided method and becomes a folower if the
 // Term gotten from the response(CurrentTerm) is different from the starting Term before the RPC call was made
 func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service string, args interface{}, res interface{}) error {
-	//fmt.Println("RPCALL", service)
 	if err := cm.iserver.Call(id, service, args, res); err == nil {
-
-		//fmt.Println(service)
-		//if service == "CnsModule.AppendEntries" {
-		//	v0, _ := args.(AppendEntriesArgs)
-		//
-		//	fmt.Println("VZEROOOO", v0)
-		//
-		//}
-		//fmt.Println("VZEROOOO-NOHIT", service)
 		v, ok := res.(*RVResults)
 		if ok {
 			_, currentState := cm.GetState()
 			if currentState != state {
-
 				return errors.New(fmt.Sprintf("expected state %s but got state %s", state, currentState))
 			}
 
@@ -345,14 +319,9 @@ func (cm *CnsModule) RpcCallOrFollower(state RftState, id, term int, service str
 			}
 		}
 
-		//
 		v2, ok := res.(*AppendEntriesReply)
 		if v2 != nil && ok {
 			if v2.Term > term {
-				//if v2 == nil {
-				//	fmt.Println("vusty", v2.Term)
-				//}
-
 				cm.setState(Follower, v2.Term, -1)
 				return errors.New("peer has become follower")
 			}
@@ -406,7 +375,6 @@ func (cm *CnsModule) appendOps(res AppendEntriesReply, savedTerm, id int, args i
 
 func (cm *CnsModule) commitChanSender() {
 	for range cm.newCommitReadyChan {
-
 		// Find which entries we have to apply.
 		cm.mu.Lock()
 		savedTerm := cm.CurrentTerm
@@ -490,14 +458,8 @@ func (cm *CnsModule) LeaderOps() {
 }
 
 func (cm *CnsModule) Submit(command interface{}) bool {
-
-	//cm.mu.Lock()
-	//defer cm.mu.Unlock()
 	_, state := cm.GetState()
-	//cm.dlog("Submit received by %v: %v", cm.state, command)
-	//fmt.Println("submit to server", cm.Log)
 	if state == Leader {
-		//fmt.Println("submit to leader-certain", cm.Log)
 		cm.mu.Lock()
 		cm.persistToStorage()
 		cm.Log = append(cm.Log, LogEntry{Command: command, Term: cm.CurrentTerm})
