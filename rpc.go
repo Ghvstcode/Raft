@@ -26,6 +26,7 @@ func (cm *CnsModule) RequestVote(args RVArgs, res *RVResults) error {
 	lli, llt := cm.getIndexState()
 
 	if args.Term > term {
+		DPrintf("term out of date in RV")
 		cm.setState(Follower, args.Term, -1)
 	}
 
@@ -43,6 +44,7 @@ func (cm *CnsModule) RequestVote(args RVArgs, res *RVResults) error {
 
 	res.Term = cm.CurrentTerm
 	cm.persistToStorage()
+	DPrintf("RV reply: %+v", res)
 	cm.mu.Unlock()
 	return nil
 }
@@ -53,6 +55,7 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesRep
 		return nil
 	}
 	if args.Term > term {
+		DPrintf("term out of date in AE")
 		cm.setState(Follower, args.Term, -1)
 	}
 
@@ -87,6 +90,7 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesRep
 
 			if newEntriesIndex < len(args.Entries) {
 				cm.Log = append(cm.Log[:logInsertIndex], args.Entries[newEntriesIndex:]...)
+				DPrintf("current log state: %v", cm.Log)
 			}
 
 			if args.LeaderCommit > cm.CommitIndex {
@@ -96,6 +100,7 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesRep
 					}
 					return b
 				}
+				DPrintf("...set commitIndex=%d", cm.CommitIndex)
 				cm.CommitIndex = min(args.LeaderCommit, len(cm.Log)-1)
 				cm.newCommitReadyChan <- struct{}{}
 			}
@@ -104,6 +109,7 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesRep
 
 	res.Term = term
 	cm.persistToStorage()
+	DPrintf("AE reply: %+v", res)
 	return nil
 }
 

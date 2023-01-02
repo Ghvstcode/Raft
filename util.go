@@ -2,6 +2,7 @@ package raft
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"runtime"
 	"sync"
@@ -78,11 +79,19 @@ func make_config(t *testing.T, n int) *config {
 	return cfg
 }
 
+// Debugging
+const Debug = false
+
+func DPrintf(format string, a ...interface{}) {
+	if Debug {
+		log.Printf(format, a...)
+	}
+	return
+}
+
 func (cfg *config) collectCommits(i int) {
 	for c := range cfg.commitChans[i] {
 		cfg.mu.Lock()
-		//tlog("collectCommits(%d) got %+v", i, c)
-		//tlog("collectCommits(%d) got %+v", i, c)
 		cfg.commits[i] = append(cfg.commits[i], c)
 		cfg.mu.Unlock()
 	}

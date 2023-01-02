@@ -459,6 +459,7 @@ func (cm *CnsModule) LeaderOps() {
 
 func (cm *CnsModule) Submit(command interface{}) bool {
 	_, state := cm.GetState()
+	DPrintf("Submission made by %v: %v", state, command)
 	if state == Leader {
 		cm.mu.Lock()
 		cm.persistToStorage()
