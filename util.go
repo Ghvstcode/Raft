@@ -228,69 +228,6 @@ func (cfg *config) nCommitted(index int) (int, interface{}) {
 	return count, cmd
 }
 
-// do a complete agreement.
-// it might choose the wrong leader initially,
-// and have to re-submit after giving up.
-// entirely gives up after about 10 seconds.
-// indirectly checks that the servers agree on the
-// same value, since nCommitted() checks this,
-// as do the threads that read from applyCh.
-// returns index.
-// if retry==true, may submit the command multiple
-// times, in case a leader fails just after Start().
-// if retry==false, calls Start() only once, in order
-// to simplify the early Lab 2B tests.
-//func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
-//	t0 := time.Now()
-//	starts := 0
-//	for time.Since(t0).Seconds() < 10 && cfg.checkFinished() == false {
-//		// try all the servers, maybe one is the leader.
-//		index := -1
-//		for si := 0; si < cfg.n; si++ {
-//			starts = (starts + 1) % cfg.n
-//			var rf *Server
-//			cfg.mu.Lock()
-//			if cfg.connected[starts] {
-//				rf = cfg.cluster[starts]
-//			}
-//			cfg.mu.Unlock()
-//			if rf != nil {
-//				index1, _, ok := rf.cm.
-//				if ok {
-//					index = index1
-//					break
-//				}
-//			}
-//		}
-//
-//		if index != -1 {
-//			// somebody claimed to be the leader and to have
-//			// submitted our command; wait a while for agreement.
-//			t1 := time.Now()
-//			for time.Since(t1).Seconds() < 2 {
-//				nd, cmd1 := cfg.nCommitted(index)
-//				if nd > 0 && nd >= expectedServers {
-//					// committed
-//					if cmd1 == cmd {
-//						// and it was the command we submitted.
-//						return index
-//					}
-//				}
-//				time.Sleep(20 * time.Millisecond)
-//			}
-//			if retry == false {
-//				cfg.t.Fatalf("one(%v) failed to reach agreement", cmd)
-//			}
-//		} else {
-//			time.Sleep(50 * time.Millisecond)
-//		}
-//	}
-//	if cfg.checkFinished() == false {
-//		cfg.t.Fatalf("one(%v) failed to reach agreement", cmd)
-//	}
-//	return -1
-//}
-
 func (cfg *config) checkFinished() bool {
 	z := atomic.LoadInt32(&cfg.finished)
 	return z != 0

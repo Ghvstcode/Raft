@@ -97,19 +97,13 @@ func (s *Server) ConnectToPeer(peerId int, addr net.Addr) error {
 }
 
 func (s *Server) Call(id int, service string, args interface{}, res interface{}) error {
-	//fmt.Println("call", service)
 	s.mu.Lock()
 	peer := s.peers[id]
 	s.mu.Unlock()
-	//fmt.Println("STHHHH101")
-	// If this is called after shutdown (where client.Close is called), it will
-	// return an error.
 	if peer == nil {
-		//fmt.Printf("call client %d after it's closed", id)
 		return fmt.Errorf("call client %d after it's closed", id)
 	} else {
 		if err := peer.Call(service, args, res); err != nil {
-			//fmt.Println("ERRR", err)
 			return err
 		}
 
@@ -149,7 +143,5 @@ func NewServer(serverID int, peerIds []int, ready <-chan interface{}, commitChan
 	s.quit = make(chan interface{})
 	s.commitChan = commitChan
 	s.storage = kv
-	//s.cm = NewConsensusModule(s.me, s.peerIds, s, s.ready)
-	//s.cm
 	return s
 }

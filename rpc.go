@@ -48,32 +48,23 @@ func (cm *CnsModule) RequestVote(args RVArgs, res *RVResults) error {
 }
 
 func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesReply) error {
-	//fmt.Println("welcome to this function")
 	term, state := cm.GetState()
 	if state == Dead {
 		return nil
 	}
-	//fmt.Println("ln-55")
 	if args.Term > term {
-		//fmt.Println("state was set or sth-pre")
 		cm.setState(Follower, args.Term, -1)
-		//fmt.Println("state was set or sth")
 	}
 
 	res.Success = false
-	//fmt.Println("still getting hit at this point 61")
 
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 	if args.Term == term {
 		if state != Follower {
-			// Become follower
-			//fmt.Println("become a follower")
 			cm.setState(Follower, args.Term, -1)
 		}
-		//fmt.Println("before LOCKKKK")
 
-		//fmt.Println("AFTER LOCKKKK")
 		cm.lastElectionReset = time.Now()
 		if args.PrevLogIndex == -1 ||
 			(args.PrevLogIndex < len(cm.Log) && args.PrevLogTerm == cm.Log[args.PrevLogIndex].Term) {
@@ -97,7 +88,7 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesRep
 			if newEntriesIndex < len(args.Entries) {
 				cm.Log = append(cm.Log[:logInsertIndex], args.Entries[newEntriesIndex:]...)
 			}
-			//fmt.Println("args.LeaderCommit > cm.CommitIndex", args.LeaderCommit, cm.CommitIndex, args.LeaderCommit > cm.CommitIndex)
+
 			if args.LeaderCommit > cm.CommitIndex {
 				min := func(a, b int) int {
 					if a < b {
@@ -106,12 +97,9 @@ func (cm *CnsModule) AppendEntries(args AppendEntriesArgs, res *AppendEntriesRep
 					return b
 				}
 				cm.CommitIndex = min(args.LeaderCommit, len(cm.Log)-1)
-				//fmt.Println("110-here")
 				cm.newCommitReadyChan <- struct{}{}
 			}
 		}
-
-		//cm.mu.Lock()
 	}
 
 	res.Term = term
