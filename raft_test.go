@@ -13,7 +13,7 @@ func TestInitialElection(t *testing.T) {
 	cfg := make_config(t, servers)
 	defer cfg.cleanup()
 
-	cfg.begin("Test 1: initial election")
+	cfg.begin("Test (1): initial election")
 	// is a leader elected?
 	cfg.checkOneLeader()
 	// sleep a bit to avoid racing with followers learning of the
@@ -42,7 +42,7 @@ func TestReElection(t *testing.T) {
 	cfg := make_config(t, servers)
 	defer cfg.cleanup()
 
-	cfg.begin("Test (2A): election after network failure")
+	cfg.begin("Test (2): election after network failure")
 
 	leader1 := cfg.checkOneLeader()
 
@@ -78,45 +78,12 @@ func TestReElection(t *testing.T) {
 	cfg.end()
 }
 
-//func TestManyElections(t *testing.T) {
-//	servers := 7
-//	cfg := make_config(t, servers)
-//	defer cfg.cleanup()
-//
-//	cfg.begin("Test (2A): multiple elections")
-//
-//	cfg.checkOneLeader()
-//
-//	iters := 2
-//	for ii := 1; ii < iters; ii++ {
-//		// disconnect three nodes
-//		i1 := rand.Int() % servers
-//		i2 := rand.Int() % servers
-//		i3 := rand.Int() % servers
-//		cfg.DisconnectPeer(i1)
-//		cfg.DisconnectPeer(i2)
-//		cfg.DisconnectPeer(i3)
-//
-//		// either the current leader should still be alive,
-//		// or the remaining four should elect a new one.
-//		cfg.checkOneLeader()
-//
-//		cfg.ReconnectPeer(i1)
-//		cfg.ReconnectPeer(i2)
-//		cfg.ReconnectPeer(i3)
-//	}
-//
-//	cfg.checkOneLeader()
-//
-//	cfg.end()
-//}
-
 func TestCommitOneCommand(t *testing.T) {
 	servers := 3
 	cfg := make_config(t, servers)
 	defer cfg.cleanup()
 
-	cfg.begin("Test (2B): basic agreement")
+	cfg.begin("Test (3): commit one command")
 
 	origLeaderId := cfg.checkOneLeader()
 
@@ -134,6 +101,8 @@ func TestSubmitNonLeaderFails(t *testing.T) {
 	cfg := make_config(t, servers)
 	defer cfg.cleanup()
 
+	cfg.begin("Test (4): submitting to a non-leader fails")
+
 	origLeaderId := cfg.checkOneLeader()
 	sid := (origLeaderId + 1) % 3
 	isLeader := cfg.SubmitToServer(sid, 42)
@@ -147,6 +116,8 @@ func TestCommitMultipleCommands(t *testing.T) {
 	servers := 3
 	cfg := make_config(t, servers)
 	defer cfg.cleanup()
+
+	cfg.begin("Test (5): commit multiple commands")
 
 	origLeaderId := cfg.checkOneLeader()
 
@@ -180,6 +151,7 @@ func TestCommitWithDisconnectionAndRecover(t *testing.T) {
 	cfg := make_config(t, servers)
 	defer cfg.cleanup()
 
+	cfg.begin("Test (6): commit with disconnection & recover")
 	// Submit a couple of values to a fully connected cluster.
 	origLeaderId := cfg.checkOneLeader()
 	cfg.SubmitToServer(origLeaderId, 5)
@@ -210,6 +182,8 @@ func TestNoCommitWithNoQuorum(t *testing.T) {
 	servers := 3
 	cfg := make_config(t, servers)
 	defer cfg.cleanup()
+
+	cfg.begin("Test (7): commit with no quorum")
 
 	// Submit a couple of values to a fully connected cluster.
 	origLeaderId := cfg.checkOneLeader()
@@ -260,6 +234,7 @@ func TestCrashFollower(t *testing.T) {
 	cfg := make_config(t, servers)
 	defer cfg.cleanup()
 
+	cfg.begin("Test (8): crash follower")
 	origLeaderId := cfg.checkOneLeader()
 	cfg.SubmitToServer(origLeaderId, 5)
 
